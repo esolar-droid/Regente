@@ -1,0 +1,370 @@
+/* Custom styles for the application */
+
+:root {
+    --primary: #133b64;
+    --primary-light: #6a8cc0;
+    --secondary: #f39200;
+    --secondary-light: #fecb8b;
+    --tertiary: #e6e7e9;
+    --background: #fef2e3;
+    --danger: #99161b;
+    --success: #28a745;
+    --warning: #ffc107;
+}
+
+/* Body styles */
+body {
+    background-color: var(--background);
+    font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+    min-height: 100vh;
+}
+
+/* Main content area */
+.main-content {
+    padding: 2rem 1rem;
+    min-height: calc(100vh - 3.25rem); /* Account for navbar height */
+}
+
+/* Navbar styles */
+.navbar {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-height: 3.25rem;
+}
+
+.navbar-item:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.navbar-dropdown {
+    background-color: var(--primary);
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    min-width: 200px;
+}
+
+.navbar-dropdown .navbar-item:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* Box styles */
+.box {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border: 1px solid var(--tertiary);
+}
+
+/* Button styles */
+.button {
+    border-radius: 4px;
+    transition: all 0.2s ease;
+}
+
+.button.is-primary {
+    background-color: var(--primary);
+    border-color: var(--primary);
+}
+
+.button.is-primary:hover {
+    background-color: var(--primary-light);
+    border-color: var(--primary-light);
+}
+
+.button.is-secondary {
+    background-color: var(--secondary);
+    border-color: var(--secondary);
+}
+
+.button.is-secondary:hover {
+    background-color: var(--secondary-light);
+    border-color: var(--secondary-light);
+}
+
+.button.is-danger {
+    background-color: var(--danger);
+    border-color: var(--danger);
+}
+
+.button.is-danger:hover {
+    background-color: #7a1316;
+    border-color: #7a1316;
+}
+
+/* Input styles */
+.input {
+    border-radius: 4px;
+    border: 1px solid var(--tertiary);
+}
+
+.input:focus {
+    border-color: var(--primary);
+    box-shadow: 0 0 0 0.125em rgba(19, 59, 100, 0.25);
+}
+
+/* Table styles */
+.table {
+    width: 100%;
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table th {
+    background-color: var(--primary);
+    color: white;
+}
+
+.table td, .table th {
+    padding: 0.75rem;
+    vertical-align: middle;
+}
+
+.table tbody tr:nth-child(even) {
+    background-color: rgba(19, 59, 100, 0.05);
+}
+
+.table tbody tr:hover {
+    background-color: rgba(19, 59, 100, 0.1);
+}
+
+/* Notification styles */
+.notification {
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.notification.is-primary {
+    background-color: rgba(19, 59, 100, 0.2);
+    color: var(--primary);
+}
+
+.notification.is-success {
+    background-color: rgba(40, 167, 69, 0.2);
+    color: var(--success);
+}
+
+.notification.is-danger {
+    background-color: rgba(153, 22, 27, 0.2);
+    color: var(--danger);
+}
+
+.notification.is-warning {
+    background-color: rgba(255, 193, 7, 0.2);
+    color: var(--warning);
+}
+
+/* Card styles */
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: var(--primary);
+    color: white;
+    border-radius: 8px 8px 0 0;
+    padding: 1rem;
+}
+
+.card-header-title {
+    color: white;
+    margin-bottom: 0;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .main-content {
+        padding: 1.5rem 0.5rem;
+    }
+    
+    .table {
+        display: block;
+        overflow-x: auto;
+    }
+    
+    .card {
+        margin-bottom: 1rem;
+    }
+}
+
+/* Footer styles */
+.footer {
+    padding: 2rem 1rem;
+    margin-top: 0;
+}
+
+/* Utility classes */
+.has-background-primary {
+    background-color: var(--primary) !important;
+}
+
+.has-background-secondary {
+    background-color: var(--secondary) !important;
+}
+
+.has-text-primary {
+    color: var(--primary) !important;
+}
+
+.has-text-secondary {
+    color: var(--secondary) !important;
+}
+
+/* Loading spinner */
+.loading-spinner {
+    border: 3px solid var(--tertiary);
+    border-top: 3px solid var(--primary);
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+    animation: spin 1s linear infinite;
+    margin: 20px auto;
+}
+
+@keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Modal styles */
+.modal-content {
+    border-radius: 8px;
+    max-width: 500px;
+    margin: 0 auto;
+}
+
+.modal-card-head {
+    background-color: var(--primary);
+    color: white;
+    border-radius: 8px 8px 0 0;
+}
+
+.modal-card-foot {
+    border-radius: 0 0 8px 8px;
+}
+
+/* Pagination styles */
+.pagination {
+    margin-top: 1rem;
+}
+
+.pagination a {
+    border-radius: 4px;
+    padding: 0.5rem;
+    min-width: 2.5em;
+    text-align: center;
+}
+
+.pagination a:hover {
+    background-color: var(--primary);
+    color: white;
+}
+
+.pagination a.is-current {
+    background-color: var(--primary);
+    color: white;
+}
+
+/* Form styles */
+.field {
+    margin-bottom: 1rem;
+}
+
+.field:last-child {
+    margin-bottom: 0;
+}
+
+.label {
+    font-weight: 600;
+    color: var(--primary);
+}
+
+.help {
+    color: #777;
+    font-size: 0.875rem;
+}
+
+.control.is-expanded {
+    width: 100%;
+}
+
+/* Icon styles */
+.icon {
+    color: var(--primary);
+}
+
+.icon.is-left {
+    margin-right: 0.5rem;
+}
+
+.icon.is-right {
+    margin-left: 0.5rem;
+}
+
+/* Badge styles */
+.tag {
+    border-radius: 100px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.5rem;
+}
+
+.tag.is-primary {
+    background-color: rgba(19, 59, 100, 0.2);
+    color: var(--primary);
+}
+
+.tag.is-success {
+    background-color: rgba(40, 167, 69, 0.2);
+    color: var(--success);
+}
+
+.tag.is-danger {
+    background-color: rgba(153, 22, 27, 0.2);
+    color: var(--danger);
+}
+
+/* Dashboard specific styles */
+.dashboard-stats {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin-bottom: 2rem;
+}
+
+.stat-card {
+    background: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    text-align: center;
+}
+
+.stat-card .icon {
+    font-size: 2rem;
+    margin-bottom: 0.5rem;
+    color: var(--primary);
+}
+
+.stat-card .title {
+    font-size: 0.875rem;
+    color: #777;
+    margin-bottom: 0.5rem;
+}
+
+.stat-card .value {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+/* Responsive grid for dashboard */
+@media (max-width: 768px) {
+    .dashboard-stats {
+        grid-template-columns: 1fr;
+    }
+}

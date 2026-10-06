@@ -1,0 +1,23 @@
+# Public Directory Configuration
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect all requests to index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+# Deny directory listing
+Options -Indexes
+
+# Allow access to assets
+<FilesMatch "\.(css|js|png|jpg|jpeg|gif|ico|svg|woff|woff2|ttf|eot)$">
+    Require all granted
+</FilesMatch>
+
+# Block access to PHP files in public/assets
+<FilesMatch "\.php$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>

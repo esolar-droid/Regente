@@ -1,0 +1,58 @@
+# Apache Configuration
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect all requests to public/index.php
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ public/index.php [QSA,L]
+</IfModule>
+
+# Security Headers
+<IfModule mod_headers.c>
+    # Prevent MIME-sniffing
+    Header always set X-Content-Type-Options "nosniff"
+    
+    # Prevent XSS
+    Header always set X-XSS-Protection "1; mode=block"
+    
+    # Prevent Clickjacking
+    Header always set X-Frame-Options "SAMEORIGIN"
+    
+    # Content Security Policy
+    Header always set Content-Security-Policy "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: https://colmarista.com; font-src 'self'; connect-src 'self'"
+    
+    # HSTS (forzar HTTPS)
+    Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+    
+    # Referrer Policy
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    
+    # Permissions Policy
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=()"
+</IfModule>
+
+# Deny directory listing
+Options -Indexes
+
+# Block access to sensitive files
+<FilesMatch "\.(php|inc|conf|config|sql|log|env|yml|yaml|json|htaccess)$">
+    Order allow,deny
+    Deny from all
+</FilesMatch>
+
+# Block malicious User Agents
+RewriteCond %{HTTP_USER_AGENT} (sqlmap|nikto|dirbuster|wpscan|wpbf|bots|scrap|spider|crawl) [NC]
+RewriteRule ^ - [F,L]
+
+# Deny access to app/ and vendor/ directories
+<DirectoryMatch "^/workspace/github__esolar-droid__Regente/(app|vendor)">
+    Order deny,allow
+    Deny from all
+</DirectoryMatch>
+
+# Allow access to public/ directory
+<Directory "/workspace/github__esolar-droid__Regente/public">
+    AllowOverride All
+    Require all granted
+</Directory>
