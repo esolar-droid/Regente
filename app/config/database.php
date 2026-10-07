@@ -1,10 +1,18 @@
 <?php
-// Database Configuration
+/**
+ * Database Configuration
+ * 
+ * Update these values to match your Hostinger database
+ */
+
+// Database credentials for regente2.colmarista.com
+// Update these to match your actual database
+// Current configuration for: rege_colmarista2
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'colmarista');
-define('DB_USER', 'colmarista');
-define('DB_PASS', 'mjbchch1789+FR');
+define('DB_NAME', 'rege_colmarista2');
+define('DB_USER', 'rege_colmarista2');
+define('DB_PASS', 'Marsupiales-2026');
 define('DB_CHARSET', 'utf8mb4');
 
 // Establish database connection
@@ -30,6 +38,3 @@ class Database {
         return self::$connection;
     }
 }
-
-// Test connection (optional)
-// $db = Database::getConnection();

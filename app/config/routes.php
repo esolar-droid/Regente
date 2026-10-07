@@ -1,5 +1,7 @@
 <?php
-// Route Configuration
+/**
+ * Route Configuration
+ */
 
 class Router {
     private static $routes = [];
@@ -35,6 +37,7 @@ class Router {
         // Remove trailing slash
         $path = rtrim($path, '/');
         
+        // Check static routes first
         foreach (self::$routes as $route) {
             if ($route['method'] === $method && $route['path'] === $path) {
                 self::callHandler($route['handler']);
@@ -42,7 +45,7 @@ class Router {
             }
         }
         
-        // No route found - try dynamic routes
+        // Handle dynamic routes (e.g., /students/edit/1)
         self::handleDynamicRoutes($method, $path);
     }
     
@@ -68,10 +71,8 @@ class Router {
     }
     
     private static function handleDynamicRoutes($method, $path) {
-        // Handle routes with parameters like /students/edit/1
         $parts = explode('/', $path);
         
-        // Example: /students/edit/1 -> StudentsController@edit with id=1
         if (count($parts) >= 3) {
             $resource = $parts[1];
             $action = $parts[2];
@@ -100,15 +101,18 @@ class Router {
     }
 }
 
-// Define routes
+// ========== ROUTE DEFINITIONS ==========
+
+// Authentication routes
 Router::get('/', 'AuthController@splash');
 Router::get('/login', 'AuthController@login');
 Router::post('/login', 'AuthController@authenticate');
 Router::get('/logout', 'AuthController@logout');
 
+// Dashboard route
 Router::get('/dashboard', 'DashboardController@index');
 
-// User routes
+// User management routes
 Router::get('/users', 'UserController@index');
 Router::get('/users/create', 'UserController@create');
 Router::post('/users/store', 'UserController@store');
@@ -117,21 +121,37 @@ Router::post('/users/update', 'UserController@update');
 Router::get('/users/delete', 'UserController@delete');
 Router::get('/users/roles', 'RoleController@index');
 
-// Student routes
+// Student management routes
 Router::get('/students', 'StudentController@index');
 Router::get('/students/create', 'StudentController@create');
 Router::post('/students/store', 'StudentController@store');
 Router::get('/students/edit', 'StudentController@edit');
 Router::post('/students/update', 'StudentController@update');
 Router::get('/students/delete', 'StudentController@delete');
+Router::get('/students/view', 'StudentController@view');
 
-// Course routes
+// Course management routes
 Router::get('/courses', 'CourseController@index');
 Router::get('/courses/create', 'CourseController@create');
 Router::post('/courses/store', 'CourseController@store');
+Router::get('/courses/edit', 'CourseController@edit');
+Router::post('/courses/update', 'CourseController@update');
+Router::get('/courses/delete', 'CourseController@delete');
+
+// Event management routes
+Router::get('/events', 'EventController@index');
+Router::get('/events/create', 'EventController@create');
+Router::post('/events/store', 'EventController@store');
+
+// Message routes
+Router::get('/messages', 'MessageController@index');
+Router::get('/messages/create', 'MessageController@create');
+Router::post('/messages/store', 'MessageController@store');
+Router::get('/messages/whatsapp', 'MessageController@whatsapp');
 
 // Report routes
 Router::get('/reports/students', 'ReportController@students');
+Router::get('/reports/events', 'ReportController@events');
 
 // Export routes
 Router::get('/exports/students/csv', 'ExportController@studentsCsv');
@@ -149,4 +169,8 @@ Router::get('/error/403', function() {
 Router::get('/error/404', function() {
     http_response_code(404);
     require_once APP_ROOT . '/app/views/errors/404.php';
+});
+Router::get('/error/500', function() {
+    http_response_code(500);
+    require_once APP_ROOT . '/app/views/errors/500.php';
 });

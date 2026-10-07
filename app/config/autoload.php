@@ -1,6 +1,11 @@
 <?php
-// Autoloader for the application
+/**
+ * Autoloader for the application
+ * 
+ * This file loads all classes and configuration files
+ */
 
+// Autoload classes in the App namespace
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
     $baseDir = APP_ROOT . '/app/';

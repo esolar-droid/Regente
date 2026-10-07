@@ -1,5 +1,9 @@
 <?php
-// Main Application Class
+/**
+ * Main Application Class
+ * 
+ * This class initializes the application and handles routing
+ */
 
 class App {
     public function __construct() {
@@ -16,21 +20,13 @@ class App {
     }
     
     private function initializeDatabase() {
-        // Check if tables exist
-        $db = \Database::getConnection();
-        
         try {
-            // Check if usuarios table exists
-            $stmt = $db->query("SHOW TABLES LIKE 'usuarios'");
-            if ($stmt->rowCount() === 0) {
-                // Tables don't exist, we might need to create them
-                // But for now, we'll just log it
-                error_log("Database tables not found. Please ensure the database is properly set up.");
-            }
+            $db = \Database::getConnection();
             
-            // Seed permissions if empty
-            $stmt = $db->query("SELECT COUNT(*) FROM permisos");
-            if ($stmt->fetchColumn() === 0) {
+            // Check if roles table exists
+            $stmt = $db->query("SHOW TABLES LIKE 'roles'");
+            if ($stmt->rowCount() === 0) {
+                // Roles table doesn't exist, seed default permissions
                 \App\Models\Permission::seed();
             }
             
@@ -39,11 +35,13 @@ class App {
             if ($stmt->fetchColumn() === 0) {
                 // Create default admin user (password: admin123)
                 $user = new \App\Models\User();
-                $user->username = 'admin';
-                $user->name = 'Administrador';
-                $user->email = 'admin@colmarista.com';
-                $user->setPassword('admin123');
-                $user->role_id = 1; // Assuming admin role has ID 1
+                $user->nombre = 'Admin';
+                $user->apellido = 'Sistema';
+                $user->usuario = 'admin';
+                $user->contrasena = 'admin123'; // Temporary plain text
+                $user->rol = 'administrador';
+                $user->role_id = 1;
+                $user->estado = 'activo';
                 $user->save();
             }
             
