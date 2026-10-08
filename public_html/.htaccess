@@ -1,0 +1,72 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    
+    # Redirect all requests to index.php (except existing files)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ index.php [QSA,L]
+</IfModule>
+
+<IfModule mod_headers.c>
+    # Security Headers
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-XSS-Protection "1; mode=block"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=(), usb=()"
+    
+    # HSTS (only enable after confirming HTTPS works)
+    # Header always set Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+</IfModule>
+
+<IfModule mod_mime.c>
+    # Prevent MIME type sniffing
+    AddType application/octet-stream .php .phtml .php3 .phar
+</IfModule>
+
+<FilesMatch "\.(php|php5|phtml|phar)$">
+    # Deny access to PHP files in uploads directory
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</FilesMatch>
+
+# Block access to sensitive directories
+<DirectoryMatch "^.*/(app|logs|config|vendor)/">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+</DirectoryMatch>
+
+# Block common attack vectors
+<IfModule mod_rewrite.c>
+    RewriteCond %{QUERY_STRING} (<|%3C)script.*(>|%3E) [NC,OR]
+    RewriteCond %{QUERY_STRING} SELECT.*FROM.*information_schema [NC,OR]
+    RewriteCond %{QUERY_STRING} UNION.*SELECT [NC,OR]
+    RewriteCond %{QUERY_STRING} INSERT.*INTO [NC,OR]
+    RewriteCond %{QUERY_STRING} DELETE.*FROM [NC,OR]
+    RewriteCond %{QUERY_STRING} DROP.*TABLE [NC,OR]
+    RewriteCond %{QUERY_STRING} -- [NC]
+    RewriteRule ^(.*)$ - [F,L]
+</IfModule>
+
+# Block malicious User Agents
+<IfModule mod_rewrite.c>
+    RewriteCond %{HTTP_USER_AGENT} (sqlmap|nikto|dirbuster|havij|nmap|wget|curl|python-requests) [NC,OR]
+    RewriteCond %{HTTP_USER_AGENT} (Acunetix|Nessus|OpenVAS|ZAP|Burp) [NC]
+    RewriteRule ^ - [F,L]
+</IfModule>
+
+# Disable directory listing
+Options -Indexes
+
+# PHP settings
+<IfModule mod_php.c>
+    php_value session.cookie_httponly 1
+    php_value session.cookie_secure 1
+    php_value session.use_strict_mode 1
+    php_value upload_max_filesize 10M
+    php_value post_max_size 12M
+    php_value max_execution_time 60
+    php_value memory_limit 128M
+</IfModule>

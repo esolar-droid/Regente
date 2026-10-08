@@ -1,0 +1,457 @@
+/* Custom CSS for Sistema para Regentes */
+/* Institutional Colors */
+:root {
+    --primary-1: #133b64;
+    --primary-2: #f39200;
+    --secondary-1: #6a8cc0;
+    --secondary-2: #fecb8b;
+    --secondary-3: #99161b;
+    --tertiary-1: #e6e7e9;
+    --tertiary-2: #fef2e3;
+    --tertiary-3: #dddee6;
+}
+
+/* Body styles */
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background-color: var(--tertiary-1);
+}
+
+/* Navbar styles */
+.navbar {
+    background-color: var(--primary-1);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    min-height: 3.25rem;
+}
+
+.navbar-item.has-text-white,
+.navbar-link.has-text-white {
+    color: white !important;
+}
+
+.navbar-item.has-text-white:hover,
+.navbar-link.has-text-white:hover {
+    background-color: rgba(255, 255, 255, 0.1) !important;
+    color: white !important;
+}
+
+.navbar-burger.has-text-white {
+    color: white;
+}
+
+.navbar-burger.has-text-white:hover {
+    background-color: rgba(255, 255, 255, 0.1);
+}
+
+/* Main content */
+.main-content {
+    padding-top: 3.25rem;
+    min-height: calc(100vh - 3.25rem);
+}
+
+/* Section styles */
+.section {
+    padding: 1.5rem;
+}
+
+/* Box styles */
+.box {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.box:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Card styles */
+.card {
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+}
+
+.card-header {
+    background-color: var(--primary-1);
+    color: white;
+    border-radius: 8px 8px 0 0;
+}
+
+.card-header-title {
+    color: white;
+}
+
+/* Button styles */
+.button {
+    border-radius: 5px;
+    transition: all 0.2s ease;
+}
+
+.button.is-primary {
+    background-color: var(--primary-1);
+}
+
+.button.is-primary:hover {
+    background-color: #0f2d4c;
+}
+
+.button.is-info {
+    background-color: var(--secondary-1);
+}
+
+.button.is-info:hover {
+    background-color: #5a7bb8;
+}
+
+.button.is-warning {
+    background-color: var(--primary-2);
+}
+
+.button.is-warning:hover {
+    background-color: #d68200;
+}
+
+.button.is-danger {
+    background-color: var(--secondary-3);
+}
+
+.button.is-danger:hover {
+    background-color: #801317;
+}
+
+/* Input styles */
+.input {
+    border-radius: 5px;
+    border: 1px solid var(--tertiary-3);
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.input:focus {
+    border-color: var(--primary-2);
+    box-shadow: 0 0 0 0.125em rgba(243, 146, 0, 0.25);
+}
+
+/* Select styles */
+.select {
+    border-radius: 5px;
+    border: 1px solid var(--tertiary-3);
+}
+
+.select:focus {
+    border-color: var(--primary-2);
+    box-shadow: 0 0 0 0.125em rgba(243, 146, 0, 0.25);
+}
+
+/* Table styles */
+.table {
+    border-radius: 8px;
+    overflow: hidden;
+}
+
+.table th {
+    background-color: var(--primary-1);
+    color: white;
+    border: none;
+}
+
+.table td,
+.table th {
+    border: 1px solid var(--tertiary-3);
+}
+
+.table tr:hover td {
+    background-color: var(--tertiary-2);
+}
+
+/* Tag styles */
+.tag {
+    border-radius: 20px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.tag.is-primary {
+    background-color: var(--primary-1);
+}
+
+.tag.is-info {
+    background-color: var(--secondary-1);
+}
+
+.tag.is-warning {
+    background-color: var(--primary-2);
+}
+
+.tag.is-danger {
+    background-color: var(--secondary-3);
+}
+
+.tag.is-success {
+    background-color: #28a745;
+}
+
+/* Notification styles */
+.notification {
+    border-radius: 8px;
+    transition: opacity 0.3s ease;
+}
+
+.notification.is-primary {
+    background-color: var(--primary-1);
+}
+
+.notification.is-info {
+    background-color: var(--secondary-1);
+}
+
+.notification.is-warning {
+    background-color: var(--primary-2);
+}
+
+.notification.is-danger {
+    background-color: var(--secondary-3);
+}
+
+.notification.is-success {
+    background-color: #28a745;
+}
+
+/* Footer styles */
+.footer {
+    background-color: var(--primary-1);
+    color: white;
+    padding: 2rem;
+}
+
+.footer a {
+    color: var(--secondary-2);
+}
+
+.footer a:hover {
+    color: white;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .section {
+        padding: 1rem;
+    }
+    
+    .card-content {
+        padding: 1rem;
+    }
+    
+    .box {
+        padding: 1.5rem;
+    }
+    
+    .table-container {
+        overflow-x: auto;
+    }
+    
+    .table {
+        min-width: 100%;
+    }
+}
+
+/* Animations */
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeInDown {
+    from { opacity: 0; transform: translateY(-20px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.fade-in {
+    animation: fadeIn 0.5s ease-in-out;
+}
+
+.fade-in-up {
+    animation: fadeInUp 0.5s ease-in-out;
+}
+
+.fade-in-down {
+    animation: fadeInDown 0.5s ease-in-out;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: var(--tertiary-3);
+}
+
+::-webkit-scrollbar-thumb {
+    background: var(--secondary-1);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: var(--primary-1);
+}
+
+/* Loading overlay */
+.loading-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: none;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+}
+
+.loading-overlay.is-active {
+    display: flex;
+}
+
+.loading-spinner {
+    width: 50px;
+    height: 50px;
+    border: 5px solid var(--primary-2);
+    border-radius: 50%;
+    border-top-color: transparent;
+    animation: spin 1s ease-in-out infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* Modal styles */
+.modal {
+    z-index: 1001;
+}
+
+.modal-card {
+    border-radius: 8px;
+    max-width: 600px;
+    width: 90%;
+}
+
+.modal-card-head {
+    background-color: var(--primary-1);
+    color: white;
+    border-radius: 8px 8px 0 0;
+}
+
+.modal-card-title {
+    color: white;
+}
+
+.modal-card-foot {
+    border-radius: 0 0 8px 8px;
+    border-top: 1px solid var(--tertiary-3);
+}
+
+/* Pagination styles */
+.pagination {
+    margin-top: 20px;
+}
+
+.pagination a {
+    border-radius: 5px;
+    border: 1px solid var(--tertiary-3);
+    color: var(--primary-1);
+    transition: all 0.2s ease;
+}
+
+.pagination a:hover {
+    background-color: var(--primary-1);
+    color: white;
+    border-color: var(--primary-1);
+}
+
+.pagination a.is-current {
+    background-color: var(--primary-1);
+    color: white;
+    border-color: var(--primary-1);
+}
+
+/* Background color classes */
+.has-background-primary {
+    background-color: var(--primary-1);
+}
+
+.has-background-primary-light {
+    background-color: #1a4a7a;
+}
+
+.has-background-secondary {
+    background-color: var(--secondary-1);
+}
+
+.has-background-warning {
+    background-color: var(--primary-2);
+}
+
+.has-background-danger {
+    background-color: var(--secondary-3);
+}
+
+.has-background-tertiary {
+    background-color: var(--tertiary-1);
+}
+
+.has-background-tertiary-light {
+    background-color: var(--tertiary-2);
+}
+
+/* Text color classes */
+.has-text-primary {
+    color: var(--primary-1);
+}
+
+.has-text-secondary {
+    color: var(--secondary-1);
+}
+
+.has-text-warning {
+    color: var(--primary-2);
+}
+
+.has-text-danger {
+    color: var(--secondary-3);
+}
+
+.has-text-tertiary {
+    color: var(--tertiary-1);
+}
+
+/* Border color classes */
+.has-border-primary {
+    border-color: var(--primary-1);
+}
+
+.has-border-secondary {
+    border-color: var(--secondary-1);
+}
+
+.has-border-warning {
+    border-color: var(--primary-2);
+}
+
+.has-border-danger {
+    border-color: var(--secondary-3);
+}
