@@ -24,13 +24,19 @@
 </head>
 <body>
     <?php require_once 'header.php'; ?>
-    
-    <main class="main-content">
-        <?= $content ?? '' ?>
-    </main>
-    
-    <?php require_once 'footer.php'; ?>
-    
+
+    <div class="app-shell">
+        <?php require_once __DIR__ . '/sidebar.php'; ?>
+
+        <div class="app-body">
+            <main class="main-content">
+                <?= $content ?? '' ?>
+            </main>
+
+            <?php require_once 'footer.php'; ?>
+        </div>
+    </div>
+
     <!-- Custom JS -->
     <script src="/assets/js/app.js"></script>
 </body>
