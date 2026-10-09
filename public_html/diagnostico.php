@@ -50,21 +50,21 @@ class Diagnostico {
         echo ".btn { display: inline-block; padding: 8px 16px; background: #133b64; color: white; text-decoration: none; border-radius: 4px; margin: 5px 0; }";
         echo ".btn:hover { background: #0d2a48; }";
         echo "</style></head><body><div class='container'>";
-        echo "<h1>🔍 Diagnostico Completo - Sistema Regente</h1>";
+        echo "<h1> Diagnostico Completo - Sistema Regente</h1>";
         echo "<p>Generado: " . date('Y-m-d H:i:s') . " | Server: " . ($_SERVER['HTTP_HOST'] ?? 'CLI') . "</p>";
     }
     
     public static function finish() {
-        echo "<h2>📊 Resumen</h2>";
+        echo "<h2> Resumen</h2>";
         echo "<div style='display: flex; gap: 20px; margin: 20px 0;'>";
         echo "<div style='flex: 1; background: #d4edda; padding: 20px; border-radius: 8px; text-align: center;'>";
-        echo "<h3>✅ Exitos: " . count(self::$results) . "</h3>";
+        echo "<h3> Exitos: " . count(self::$results) . "</h3>";
         echo "</div>";
         echo "<div style='flex: 1; background: #fff3cd; padding: 20px; border-radius: 8px; text-align: center;'>";
-        echo "<h3>⚠️ Advertencias: " . count(self::$warnings) . "</h3>";
+        echo "<h3> Advertencias: " . count(self::$warnings) . "</h3>";
         echo "</div>";
         echo "<div style='flex: 1; background: #f8d7da; padding: 20px; border-radius: 8px; text-align: center;'>";
-        echo "<h3>❌ Errores: " . count(self::$errors) . "</h3>";
+        echo "<h3> Errores: " . count(self::$errors) . "</h3>";
         echo "</div>";
         echo "</div>";
         
@@ -93,6 +93,10 @@ class Diagnostico {
     }
     
     public static function printTable($headers, $rows) {
+        if (!is_array($rows) || empty($rows)) {
+            echo "<p>No hay datos para mostrar</p>";
+            return;
+        }
         echo "<table><thead><tr>";
         foreach ($headers as $header) {
             echo "<th>$header</th>";
@@ -116,11 +120,11 @@ Diagnostico::init();
 // 1. PRUEBA DE ENTORNO BASICO
 // ============================================================================
 
-Diagnostico::printSection("🌍 1. Entorno Basico");
+Diagnostico::printSection(" 1. Entorno Basico");
 
 // PHP Version
 Diagnostico::addResult(
-    "Versión de PHP",
+    "Version de PHP",
     "PHP " . PHP_VERSION . " (" . PHP_OS . ")",
     'info'
 );
@@ -133,7 +137,7 @@ $serverInfo = [
     'REQUEST_URI' => $_SERVER['REQUEST_URI'] ?? 'N/A',
     'REMOTE_ADDR' => $_SERVER['REMOTE_ADDR'] ?? 'N/A',
 ];
-Diagnostico::addResult("Información del Servidor", "Variables de servidor", 'info', $serverInfo);
+Diagnostico::addResult("Informacion del Servidor", "Variables de servidor", 'info', $serverInfo);
 
 // PHP Configuration
 $phpConfig = [
@@ -141,18 +145,18 @@ $phpConfig = [
     'log_errors' => ini_get('log_errors'),
     'error_log' => ini_get('error_log'),
     'error_reporting' => error_reporting(),
-    'memory_limit' => ini_get('memory_limit'),
+    'memory_limit' => ini_set('memory_limit'),
     'max_execution_time' => ini_get('max_execution_time'),
     'upload_max_filesize' => ini_get('upload_max_filesize'),
     'post_max_size' => ini_get('post_max_size'),
 ];
-Diagnostico::addResult("Configuración PHP", "Valores actuales", 'info', $phpConfig);
+Diagnostico::addResult("Configuracion PHP", "Valores actuales", 'info', $phpConfig);
 
 // ============================================================================
 // 2. PRUEBA DE ESTRUCTURA DE ARCHIVOS
 // ============================================================================
 
-Diagnostico::printSection("📁 2. Estructura de Archivos");
+Diagnostico::printSection(" 2. Estructura de Archivos");
 
 // Definir rutas base
 $currentDir = __DIR__;
@@ -180,8 +184,8 @@ foreach ($directories as $dir) {
     $writable = $exists ? is_writable($dir[1]) : false;
     $dirResults[] = [
         $dir[0],
-        $exists ? '✅' : '❌',
-        $exists ? ($writable ? '✅' : '❌') : 'N/A',
+        $exists ? ' Existe' : 'No existe',
+        $exists ? ($writable ? 'Writable' : 'No writable') : 'N/A',
         $exists ? 'Existe' : 'NO EXISTE'
     ];
     
@@ -217,7 +221,7 @@ foreach ($criticalFiles as $file) {
     $fullPath = $publicHtmlDir . '/' . $file;
     $exists = file_exists($fullPath);
     $readable = $exists ? is_readable($fullPath) : false;
-    $fileResults[] = [$file, $exists ? '✅' : '❌', $exists ? ($readable ? '✅' : '❌') : 'N/A'];
+    $fileResults[] = [$file, $exists ? 'Existe' : 'No', $exists ? ($readable ? 'Legible' : 'No legible') : 'N/A'];
     
     if (!$exists) {
         Diagnostico::addResult("Archivo faltante", "El archivo $file NO EXISTE", 'error');
@@ -230,74 +234,44 @@ Diagnostico::printTable(['Archivo', 'Existe', 'Legible'], $fileResults);
 // 3. PRUEBA DE AUTOLADERS Y CLASSES
 // ============================================================================
 
-Diagnostico::printSection("🔄 3. Autoloaders y Clases");
+Diagnostico::printSection(" 3. Autoloaders y Clases");
 
-// Probar cargar clases manualmente
-Diagnostico::addResult("Carga Manual", "Probando carga de clases esenciales...", 'info');
-
-$testClasses = [
-    'Database' => $appDir . '/config/database.php',
-    'Router' => $publicHtmlDir . '/Router.php',
-    'App\\Models\\Model' => $appDir . '/models/Model.php',
-    'App\\Models\\User' => $appDir . '/models/User.php',
-    'App\\Controllers\\AuthController' => $appDir . '/controllers/AuthController.php',
-    'App\\Middleware\\AuthMiddleware' => $appDir . '/middleware/AuthMiddleware.php',
-];
-
-foreach ($testClasses as $class => $expectedPath) {
-    try {
-        if (file_exists($expectedPath)) {
-            require_once $expectedPath;
-            if (class_exists($class)) {
-                Diagnostico::addResult("Clase $class", "✅ Cargada correctamente desde: $expectedPath", 'success');
-            } else {
-                Diagnostico::addResult("Clase $class", "❌ Archivo existe pero clase no encontrada: $expectedPath", 'error');
-            }
-        } else {
-            Diagnostico::addResult("Clase $class", "❌ Archivo no existe: $expectedPath", 'error');
-        }
-    } catch (Throwable $e) {
-        Diagnostico::addResult("Clase $class", "❌ Error al cargar: " . $e->getMessage(), 'error');
-    }
-}
-
-// Probar autoloader completo
+// Cargar el autoloader de la aplicacion primero
 Diagnostico::addResult("Autoloader", "Probando autoloader de la aplicacion...", 'info');
 
 try {
-    // Cargar autoloader
     if (file_exists($appDir . '/config/autoload.php')) {
         require_once $appDir . '/config/autoload.php';
-        Diagnostico::addResult("Autoloader", "✅ Autoloader cargado", 'success');
+        Diagnostico::addResult("Autoloader", "Autoloader cargado", 'success');
         
         // Verificar si APP_ROOT esta definido
         if (defined('APP_ROOT')) {
             Diagnostico::addResult("APP_ROOT", "Definido como: " . APP_ROOT, 'success');
         } else {
-            Diagnostico::addResult("APP_ROOT", "❌ No esta definido", 'error');
+            Diagnostico::addResult("APP_ROOT", "No esta definido", 'error');
         }
         
         // Probar cargar clases con autoloader
-        $testWithAutoloader = ['Database', 'Router'];
+        $testWithAutoloader = ['Database', 'Router', 'App\\Models\\Model', 'App\\Models\\User', 'App\\Controllers\\Controller', 'App\\Controllers\\AuthController', 'App\\Middleware\\AuthMiddleware'];
         foreach ($testWithAutoloader as $class) {
             if (class_exists($class)) {
-                Diagnostico::addResult("Autoloader: $class", "✅ Clase disponible", 'success');
+                Diagnostico::addResult("Autoloader: $class", "Clase disponible", 'success');
             } else {
-                Diagnostico::addResult("Autoloader: $class", "❌ Clase NO disponible", 'error');
+                Diagnostico::addResult("Autoloader: $class", "Clase NO disponible", 'error');
             }
         }
     } else {
-        Diagnostico::addResult("Autoloader", "❌ Archivo autoload.php no existe", 'error');
+        Diagnostico::addResult("Autoloader", "Archivo autoload.php no existe", 'error');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("Autoloader", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Autoloader", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 4. PRUEBA DE CONEXION A BASE DE DATOS
 // ============================================================================
 
-Diagnostico::printSection("🗄️ 4. Conexion a Base de Datos");
+Diagnostico::printSection(" 4. Conexion a Base de Datos");
 
 Diagnostico::addResult("Configuracion DB", "Verificando configuracion de database.php...", 'info');
 
@@ -313,14 +287,14 @@ try {
             'DB_PASS' => defined('DB_PASS') ? '*****' : 'N/A',
             'DB_CHARSET' => defined('DB_CHARSET') ? DB_CHARSET : 'N/A',
         ];
-        Diagnostico::addResult("Configuracion", "Parámetros de conexión", 'info', $dbConfig);
+        Diagnostico::addResult("Configuracion", "Parametros de conexion", 'info', $dbConfig);
         
         // Probar conexion
         Diagnostico::addResult("Conexion DB", "Intentando conectar a la base de datos...", 'info');
         
         $db = Database::getConnection();
         if ($db) {
-            Diagnostico::addResult("Conexion DB", "✅ Conexion exitosa a: " . DB_NAME, 'success');
+            Diagnostico::addResult("Conexion DB", "Conexion exitosa a: " . DB_NAME, 'success');
             
             // Probar consulta simple
             try {
@@ -328,50 +302,50 @@ try {
                 $tables = $stmt->fetchAll(PDO::FETCH_COLUMN);
                 
                 if (!empty($tables)) {
-                    Diagnostico::addResult("Tablas", "✅ Se encontraron " . count($tables) . " tablas", 'success');
-                    Diagnostico::printTable(['Tablas en ' . DB_NAME], [implode(', ', $tables)]);
+                    Diagnostico::addResult("Tablas", "Se encontraron " . count($tables) . " tablas", 'success');
+                    Diagnostico::addResult("Tablas en " . DB_NAME, "Tablas: " . implode(', ', $tables), 'info');
                 } else {
-                    Diagnostico::addResult("Tablas", "⚠️ No se encontraron tablas en la base de datos", 'warning');
+                    Diagnostico::addResult("Tablas", "No se encontraron tablas en la base de datos", 'warning');
                 }
             } catch (PDOException $e) {
-                Diagnostico::addResult("Consulta DB", "❌ Error al listar tablas: " . $e->getMessage(), 'error');
+                Diagnostico::addResult("Consulta DB", "Error al listar tablas: " . $e->getMessage(), 'error');
             }
             
             // Probar tabla usuarios
             try {
                 $stmt = $db->query("SELECT COUNT(*) as count FROM usuarios");
                 $result = $stmt->fetch();
-                Diagnostico::addResult("Tabla usuarios", "✅ Existen " . $result['count'] . " usuarios", 'success');
+                Diagnostico::addResult("Tabla usuarios", "Existen " . $result['count'] . " usuarios", 'success');
             } catch (PDOException $e) {
-                Diagnostico::addResult("Tabla usuarios", "❌ Error: " . $e->getMessage(), 'error');
+                Diagnostico::addResult("Tabla usuarios", "Error: " . $e->getMessage(), 'error');
             }
             
             // Probar tabla roles
             try {
                 $stmt = $db->query("SELECT COUNT(*) as count FROM roles");
                 $result = $stmt->fetch();
-                Diagnostico::addResult("Tabla roles", "✅ Existen " . $result['count'] . " roles", 'success');
+                Diagnostico::addResult("Tabla roles", "Existen " . $result['count'] . " roles", 'success');
             } catch (PDOException $e) {
-                Diagnostico::addResult("Tabla roles", "❌ Error: " . $e->getMessage(), 'error');
+                Diagnostico::addResult("Tabla roles", "Error: " . $e->getMessage(), 'error');
             }
             
         } else {
-            Diagnostico::addResult("Conexion DB", "❌ No se pudo establecer conexion", 'error');
+            Diagnostico::addResult("Conexion DB", "No se pudo establecer conexion", 'error');
         }
     } else {
-        Diagnostico::addResult("Configuracion DB", "❌ Archivo database.php no existe", 'error');
+        Diagnostico::addResult("Configuracion DB", "Archivo database.php no existe", 'error');
     }
 } catch (PDOException $e) {
-    Diagnostico::addResult("Conexion DB", "❌ Error PDO: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Conexion DB", "Error PDO: " . $e->getMessage(), 'error');
 } catch (Throwable $e) {
-    Diagnostico::addResult("Conexion DB", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Conexion DB", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 5. PRUEBA DE LOGGING
 // ============================================================================
 
-Diagnostico::printSection("📝 5. Sistema de Logging");
+Diagnostico::printSection(" 5. Sistema de Logging");
 
 Diagnostico::addResult("Configuracion Logs", "Verificando configuracion de logs...", 'info');
 
@@ -379,12 +353,12 @@ Diagnostico::addResult("Configuracion Logs", "Verificando configuracion de logs.
 $logDir = $publicHtmlDir . '/logs';
 if (!is_dir($logDir)) {
     if (mkdir($logDir, 0755, true)) {
-        Diagnostico::addResult("Directorio logs/", "✅ Creado: $logDir", 'success');
+        Diagnostico::addResult("Directorio logs/", "Creado: $logDir", 'success');
     } else {
-        Diagnostico::addResult("Directorio logs/", "❌ No se pudo crear: $logDir", 'error');
+        Diagnostico::addResult("Directorio logs/", "No se pudo crear: $logDir", 'error');
     }
 } else {
-    Diagnostico::addResult("Directorio logs/", "✅ Ya existe: $logDir", 'success');
+    Diagnostico::addResult("Directorio logs/", "Ya existe: $logDir", 'success');
 }
 
 // Probar escribir en log
@@ -392,12 +366,12 @@ $logFile = $logDir . '/error.log';
 try {
     $testMessage = "[DIAGNOSTICO] Prueba de escritura de log - " . date('Y-m-d H:i:s');
     if (file_put_contents($logFile, $testMessage . PHP_EOL, FILE_APPEND) !== false) {
-        Diagnostico::addResult("Escritura Log", "✅ Se pudo escribir en: $logFile", 'success');
+        Diagnostico::addResult("Escritura Log", "Se pudo escribir en: $logFile", 'success');
     } else {
-        Diagnostico::addResult("Escritura Log", "❌ No se pudo escribir en: $logFile", 'error');
+        Diagnostico::addResult("Escritura Log", "No se pudo escribir en: $logFile", 'error');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("Escritura Log", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Escritura Log", "Error: " . $e->getMessage(), 'error');
 }
 
 // Probar error_log de PHP
@@ -405,65 +379,65 @@ try {
     ini_set('error_log', $logFile);
     ini_set('log_errors', 1);
     error_log("[DIAGNOSTICO] Prueba error_log() - " . date('Y-m-d H:i:s'));
-    Diagnostico::addResult("error_log()", "✅ Funcion error_log() configurada", 'success');
+    Diagnostico::addResult("error_log()", "Funcion error_log() configurada", 'success');
 } catch (Throwable $e) {
-    Diagnostico::addResult("error_log()", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("error_log()", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 6. PRUEBA DE APLICACION COMPLETA
 // ============================================================================
 
-Diagnostico::printSection("🚀 6. Prueba de Aplicacion Completa");
+Diagnostico::printSection(" 6. Prueba de Aplicacion Completa");
 
 Diagnostico::addResult("Inicializacion App", "Intentando inicializar la aplicacion completa...", 'info');
 
 try {
-    // Requerir todos los archivos principales
+    // Requerir index.php
     require_once $publicHtmlDir . '/index.php';
-    Diagnostico::addResult("index.php", "✅ Cargado correctamente", 'success');
+    Diagnostico::addResult("index.php", "Cargado correctamente", 'success');
 } catch (Throwable $e) {
-    Diagnostico::addResult("index.php", "❌ Error: " . $e->getMessage() . " en " . $e->getFile() . ":" . $e->getLine(), 'error');
+    Diagnostico::addResult("index.php", "Error: " . $e->getMessage() . " en " . $e->getFile() . ":" . $e->getLine(), 'error');
 }
 
 try {
     // Probar crear instancia de App
     if (class_exists('App')) {
         $app = new App();
-        Diagnostico::addResult("Clase App", "✅ Instancia creada correctamente", 'success');
+        Diagnostico::addResult("Clase App", "Instancia creada correctamente", 'success');
     } else {
-        Diagnostico::addResult("Clase App", "❌ Clase App no disponible", 'error');
+        Diagnostico::addResult("Clase App", "Clase App no disponible", 'error');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("Clase App", "❌ Error: " . $e->getMessage() . " en " . $e->getFile() . ":" . $e->getLine(), 'error');
+    Diagnostico::addResult("Clase App", "Error: " . $e->getMessage() . " en " . $e->getFile() . ":" . $e->getLine(), 'error');
 }
 
 try {
     // Probar Router
     if (class_exists('Router')) {
         Router::get('/test', function() { echo 'OK'; });
-        Diagnostico::addResult("Router", "✅ Router funcional", 'success');
+        Diagnostico::addResult("Router", "Router funcional", 'success');
     } else {
-        Diagnostico::addResult("Router", "❌ Clase Router no disponible", 'error');
+        Diagnostico::addResult("Router", "Clase Router no disponible", 'error');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("Router", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Router", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 7. PRUEBA DE CODIFICACION
 // ============================================================================
 
-Diagnostico::printSection("🔤 7. Prueba de Codificacion");
+Diagnostico::printSection(" 7. Prueba de Codificacion");
 
 Diagnostico::addResult("Codificacion", "Verificando manejo de caracteres...", 'info');
 
 // Probar UTF-8
-$utf8Test = "Hola Mundo - 你好世界 - Привет мир - こんにちは世界";
+$utf8Test = "Hola Mundo - youtube.com 你好世界 - Привет мир - こんにちは世界";
 if (mb_detect_encoding($utf8Test, 'UTF-8', true)) {
-    Diagnostico::addResult("UTF-8", "✅ Codificacion UTF-8 funcional", 'success');
+    Diagnostico::addResult("UTF-8", "Codificacion UTF-8 funcional", 'success');
 } else {
-    Diagnostico::addResult("UTF-8", "❌ Problemas con UTF-8", 'error');
+    Diagnostico::addResult("UTF-8", "Problemas con UTF-8", 'error');
 }
 
 // Probar conexion con caracteres especiales
@@ -474,26 +448,26 @@ try {
     $stmt->execute([$testText]);
     $result = $stmt->fetch();
     if ($result['text'] === $testText) {
-        Diagnostico::addResult("DB + UTF-8", "✅ Base de datos maneja UTF-8 correctamente", 'success');
+        Diagnostico::addResult("DB + UTF-8", "Base de datos maneja UTF-8 correctamente", 'success');
     } else {
-        Diagnostico::addResult("DB + UTF-8", "⚠️ Posibles problemas con caracteres especiales", 'warning');
+        Diagnostico::addResult("DB + UTF-8", "Posibles problemas con caracteres especiales", 'warning');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("DB + UTF-8", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("DB + UTF-8", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 8. PRUEBA DE SEGURIDAD
 // ============================================================================
 
-Diagnostico::printSection("🔒 8. Prueba de Seguridad");
+Diagnostico::printSection(" 8. Prueba de Seguridad");
 
 Diagnostico::addResult("Seguridad", "Verificando configuracion de seguridad...", 'info');
 
 // Verificar security.php
 if (file_exists($appDir . '/config/security.php')) {
     require_once $appDir . '/config/security.php';
-    Diagnostico::addResult("security.php", "✅ Archivo de seguridad cargado", 'success');
+    Diagnostico::addResult("security.php", "Archivo de seguridad cargado", 'success');
     
     $securityConfig = [
         'SESSION_NAME' => defined('SESSION_NAME') ? SESSION_NAME : 'N/A',
@@ -503,7 +477,7 @@ if (file_exists($appDir . '/config/security.php')) {
     ];
     Diagnostico::addResult("Configuracion Seguridad", "Parametros de seguridad", 'info', $securityConfig);
 } else {
-    Diagnostico::addResult("security.php", "❌ Archivo no existe", 'error');
+    Diagnostico::addResult("security.php", "Archivo no existe", 'error');
 }
 
 // Verificar sesiones
@@ -513,7 +487,7 @@ Diagnostico::addResult("Sesiones", "Estado de sesiones: " . (session_status() ==
 // 9. PRUEBA DE EXPORTACIONES (CSV/PDF)
 // ============================================================================
 
-Diagnostico::printSection("📊 9. Prueba de Exportaciones");
+Diagnostico::printSection(" 9. Prueba de Exportaciones");
 
 Diagnostico::addResult("Exportaciones", "Verificando capacidades de exportacion...", 'info');
 
@@ -526,9 +500,9 @@ $exportFiles = [
 foreach ($exportFiles as $file) {
     $fullPath = $publicHtmlDir . '/' . $file;
     if (file_exists($fullPath)) {
-        Diagnostico::addResult("Exportacion: $file", "✅ Archivo existe", 'success');
+        Diagnostico::addResult("Exportacion: $file", "Archivo existe", 'success');
     } else {
-        Diagnostico::addResult("Exportacion: $file", "⚠️ Archivo no encontrado", 'warning');
+        Diagnostico::addResult("Exportacion: $file", "Archivo no encontrado", 'warning');
     }
 }
 
@@ -540,24 +514,24 @@ try {
     }
     $csvContent = "col1,col2,col3\nval1,val2,val3\n";
     if (file_put_contents($testCsv, $csvContent) !== false) {
-        Diagnostico::addResult("Export CSV", "✅ Se puede crear archivos CSV", 'success');
+        Diagnostico::addResult("Export CSV", "Se puede crear archivos CSV", 'success');
         unlink($testCsv); // Limpiar
     } else {
-        Diagnostico::addResult("Export CSV", "❌ No se puede crear archivos CSV", 'error');
+        Diagnostico::addResult("Export CSV", "No se puede crear archivos CSV", 'error');
     }
 } catch (Throwable $e) {
-    Diagnostico::addResult("Export CSV", "❌ Error: " . $e->getMessage(), 'error');
+    Diagnostico::addResult("Export CSV", "Error: " . $e->getMessage(), 'error');
 }
 
 // ============================================================================
 // 10. RESUMEN FINAL
 // ============================================================================
 
-Diagnostico::printSection("📋 10. Resumen Final");
+Diagnostico::printSection(" 10. Resumen Final");
 
 Diagnostico::addResult(
     "Resumen",
-    "Diagnostico completado. Revisa los errores (❌) y advertencias (⚠️) arriba.",
+    "Diagnostico completado. Revisa los errores y advertencias arriba.",
     'info'
 );
 
