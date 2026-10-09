@@ -27,8 +27,9 @@ function initNavbar() {
                 const target = el.dataset.target;
                 const targetElement = document.getElementById(target);
                 
-                el.classList.toggle('is-active');
+                const isActive = el.classList.toggle('is-active');
                 targetElement.classList.toggle('is-active');
+                el.setAttribute('aria-expanded', String(isActive));
             });
         });
     }
