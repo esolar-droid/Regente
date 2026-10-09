@@ -24,9 +24,13 @@ spl_autoload_register(function ($class) {
     }
     
     $relativeClass = substr($class, $len);
-    // Convert namespace to file path (lowercase directory names for Linux compatibility)
+    // Convert namespace to file path
+    // For Linux: convert directory names to lowercase, but preserve filename case
     $filePath = str_replace('\\', '/', $relativeClass);
-    $file = $baseDir . strtolower($filePath) . '.php';
+    $parts = explode('/', $filePath);
+    $filename = array_pop($parts);
+    $dirPath = implode('/', array_map('strtolower', $parts));
+    $file = $baseDir . $dirPath . '/' . $filename . '.php';
     
     if (file_exists($file)) {
         require $file;
