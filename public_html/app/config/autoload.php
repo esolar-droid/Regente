@@ -16,7 +16,7 @@ if (!defined('APP_ROOT')) {
 // Autoload classes in the App namespace
 spl_autoload_register(function ($class) {
     $prefix = 'App\\';
-    $baseDir = APP_ROOT . '/';
+    $baseDir = APP_ROOT . '/app/';
     
     $len = strlen($prefix);
     if (strncmp($prefix, $class, $len) !== 0) {

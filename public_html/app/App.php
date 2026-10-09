@@ -8,7 +8,16 @@
 class App {
     public function __construct() {
         // Initialize security headers
-        \App\Middleware\SecurityHeadersMiddleware::setHeaders();
+        if (class_exists('\App\Middleware\SecurityHeadersMiddleware')) {
+            \App\Middleware\SecurityHeadersMiddleware::setHeaders();
+        } else {
+            // Fallback: set basic security headers manually
+            header('X-Frame-Options: SAMEORIGIN');
+            header('X-Content-Type-Options: nosniff');
+            header('X-XSS-Protection: 1; mode=block');
+            header('Referrer-Policy: strict-origin-when-cross-origin');
+            header('Permissions-Policy: geolocation=(), microphone=(), camera=(), payment=(), usb=()');
+        }
         
         // Check if database tables exist and seed if needed
         $this->initializeDatabase();
