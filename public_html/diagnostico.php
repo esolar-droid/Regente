@@ -27,6 +27,7 @@ class Diagnostico {
     private static $results = [];
     private static $errors = [];
     private static $warnings = [];
+    private static $infos = [];
     
     public static function init() {
         ob_start();
@@ -72,7 +73,12 @@ class Diagnostico {
     }
     
     public static function addResult($title, $message, $type = 'success', $data = null) {
-        self::${$type . 's'}[] = ['title' => $title, 'message' => $message, 'data' => $data];
+        $property = $type . 's';
+        if (property_exists(__CLASS__, $property)) {
+            self::$$property[] = ['title' => $title, 'message' => $message, 'data' => $data];
+        } else {
+            self::$results[] = ['title' => $title, 'message' => $message, 'data' => $data];
+        }
         
         $class = $type;
         echo "<div class='section $class'><strong>[$type] $title</strong><br>" . nl2br(htmlspecialchars($message)) . "</div>";
