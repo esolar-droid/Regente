@@ -5,6 +5,9 @@
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php [QSA,L]
+    
+    # Allow access to diagnostico.php
+    RewriteCond %{REQUEST_URI} !^/diagnostico\.php$
 </IfModule>
 
 <IfModule mod_headers.c>
@@ -37,6 +40,19 @@
         Require all denied
     </IfModule>
 </DirectoryMatch>
+
+# Allow access to public directories
+<Directory "public_html/assets/">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</Directory>
+
+<Directory "public_html/uploads/">
+    <IfModule mod_authz_core.c>
+        Require all granted
+    </IfModule>
+</Directory>
 
 # Block common attack vectors
 <IfModule mod_rewrite.c>
