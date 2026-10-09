@@ -381,3 +381,33 @@ window.formatDateTime = formatDateTime;
 window.formatCurrency = formatCurrency;
 window.truncateText = truncateText;
 window.copyToClipboard = copyToClipboard;
+
+// ==========================================================================
+// Sidebar toggle
+// ==========================================================================
+(function () {
+    document.addEventListener('DOMContentLoaded', () => {
+        const toggle = document.getElementById('sidebarToggle');
+        if (!toggle) return;
+
+        toggle.addEventListener('click', () => {
+            if (window.innerWidth <= 1023) {
+                document.body.classList.toggle('sidebar-open');
+            } else {
+                document.body.classList.toggle('sidebar-collapsed');
+            }
+        });
+
+        // Cerrar el sidebar móvil al hacer clic fuera de él
+        document.addEventListener('click', (e) => {
+            const sidebar = document.getElementById('appSidebar');
+            if (!sidebar) return;
+            if (window.innerWidth <= 1023 &&
+                document.body.classList.contains('sidebar-open') &&
+                !sidebar.contains(e.target) &&
+                !toggle.contains(e.target)) {
+                document.body.classList.remove('sidebar-open');
+            }
+        });
+    });
+})();
