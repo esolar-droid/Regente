@@ -24,7 +24,9 @@ spl_autoload_register(function ($class) {
     }
     
     $relativeClass = substr($class, $len);
-    $file = $baseDir . str_replace('\\', '/', $relativeClass) . '.php';
+    // Convert namespace to file path (lowercase directory names for Linux compatibility)
+    $filePath = str_replace('\\', '/', $relativeClass);
+    $file = $baseDir . strtolower($filePath) . '.php';
     
     if (file_exists($file)) {
         require $file;
