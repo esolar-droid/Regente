@@ -29,6 +29,14 @@ define('PUBLIC_ROOT', __DIR__);
 error_reporting(E_ALL);
 ini_set('display_errors', 0); // Production mode
 
+// Configurar logging
+$logDir = APP_ROOT . '/logs';
+if (!is_dir($logDir)) {
+    mkdir($logDir, 0755, true);
+}
+ini_set('error_log', $logDir . '/error.log');
+ini_set('log_errors', 1);
+
 // Verify app directory exists
 if (!is_dir(APP_ROOT . '/app')) {
     die("Error: Application directory not found. Expected: " . htmlspecialchars(APP_ROOT . '/app'));
