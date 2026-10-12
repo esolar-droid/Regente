@@ -73,6 +73,9 @@ $add('1. Arranque', 'Helpers cargados', $ok ? 'OK' : 'FAIL', is_string($res) ? $
 
 // ============ PASO 2: CONEXIÓN BD ============
 list($ok, $pdo) = try_call(function () {
+    if (!class_exists('Database')) throw new \RuntimeException('La clase Database no está disponible');
+    // soporta getConnection() directo o getInstance()->getConnection()
+    if (method_exists('Database', 'getConnection')) return Database::getConnection();
     return Database::getInstance()->getConnection();
 });
 if (!$ok) {
@@ -132,25 +135,24 @@ foreach (['index', 'show', 'form'] as $v) {
     }
 }
 
-// ============ PASO 6: RENDER REAL DE LA VISTA INDEX ============
-if ($ok && isset($pdo)) {
-    list($rok, $rout) = try_call(function () use ($pdo) {
-        $stu = new App\Models\Student();
-        $rows = null;
-        foreach (['paginate', 'all', 'search'] as $mth) {
-            if (method_exists($stu, $mth)) {
-                try { $rows = $stu->$mth(1, 25, [], null); break; }
-                catch (\Throwable $e) { try { $rows = $stu->$mth(); break; } catch (\Throwable $e2) {} }
-            }
-        }
-        if ($rows === null) throw new \RuntimeException('No se pudo llamar a ningún método de listado del modelo');
+// ============ PASO 6: RENDER REAL DE LA VISTA INDEX (igual que el controlador) ============
+if ($ok && $pdo instanceof PDO) {
+    list($rok, $rout) = try_call(function () {
+        // Reutilizar el método index() del controlador real es lo más fiel:
+        $ctrlFile = ROOT . '/app/controllers/StudentController.php';
+        if (!class_exists('App\\Controllers\\StudentController')) throw new \RuntimeException('No se puede instanciar el controlador');
+        $_GET['page'] = '1';
+        $c = new App\Controllers\StudentController();
         ob_start();
-        $students = $rows; $total = is_array($rows) ? count($rows) : 0; $q = ''; $estado = ''; $curso = ''; $gestion = ['anio' => 2026];
-        include ROOT . '/app/views/students/index.php';
+        $c->index();
         $html = ob_get_clean();
-        return strlen($html) . ' bytes generados sin errores';
+        $len = strlen($html);
+        if ($len < 500) throw new \RuntimeException("index() produjo solo $len bytes — probable error silencioso");
+        return "index() renderizo $len bytes de HTML correctamente";
     });
-    $add('6. Render', 'Ejecutar students/index.php', $rok ? 'OK' : 'FAIL', is_string($rout) ? $rout : '');
+    $add('6. Render', 'Ejecutar StudentController::index()', $rok ? 'OK' : 'FAIL', is_string($rout) ? $rout : '');
+} else {
+    $add('6. Render', 'Ejecutar StudentController::index()', 'WARN', 'Omitido: sin conexión BD en el paso 2');
 }
 
 // ============ PASO 7: MENÚ LATERAL ============
@@ -167,6 +169,7 @@ $add('7. Menú', 'sidebar.php contiene enlace Estudiantes', $mok && strpos((stri
 
 // Simular decisión de visibilidad para TU usuario real logueado
 list($uok, $uout) = try_call(function () use ($pdo) {
+    if (!$pdo instanceof PDO) throw new \RuntimeException('Sin conexión BD: no se pueden verificar permisos. (Si el paso 2 falló por credenciales, esto es consecuencia, no causa nueva.)');
     $uid = $_SESSION['user_id'] ?? null;
     if (!$uid) {
         // buscar sesión activa de REGENTE_SESSION si coincide el navegador... normalmente no tendremos; probemos todos los usuarios
