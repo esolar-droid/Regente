@@ -110,7 +110,7 @@ ob_start();
                                 </div>
                                 <div class="column is-4">
                                     <div class="notification is-danger">
-                                        <p><strong>Ausencias:</strong> <?= $stats['total_ausencias'] ?? 0 ?></p>
+                                        <p><strong>Faltas:</strong> <?= $stats['total_faltas'] ?? 0 ?></p>
                                     </div>
                                 </div>
                             </div>

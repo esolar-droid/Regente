@@ -42,6 +42,18 @@ abstract class Model {
     public static function getPrimaryKey() {
         return static::$primaryKey;
     }
+
+    /**
+     * Filas crudas ordenadas por una columna (para listas desplegables, etc).
+     * Devuelve array de arrays asociativos. Lanza PDOException si falla
+     * (el diagnostico lo necesita ver para marcar FAIL con la causa real).
+     */
+    public static function orderBy($column, $dir = 'ASC', $limit = 0) {
+        $dir = strtoupper($dir) === 'DESC' ? 'DESC' : 'ASC';
+        $sql = 'SELECT * FROM `' . static::$table . '` ORDER BY `' . $column . '` ' . $dir;
+        if ($limit > 0) $sql .= ' LIMIT ' . (int)$limit;
+        return self::getDb()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+    }
     
     protected static function getDb() {
         return \Database::getConnection();

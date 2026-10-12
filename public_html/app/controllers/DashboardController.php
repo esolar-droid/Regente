@@ -34,7 +34,7 @@ class DashboardController extends Controller {
             $stats['total_events'] = $eventStats['total'];
             $stats['total_atrasos'] = $eventStats['atraso'];
             $stats['total_licencias'] = $eventStats['licencia'];
-            $stats['total_ausencias'] = $eventStats['ausencia'];
+            $stats['total_faltas'] = $eventStats['falta'];
             
             // Get active management
             $activeManagement = Management::getActive();

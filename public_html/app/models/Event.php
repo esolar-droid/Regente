@@ -124,15 +124,18 @@ class Event extends Model {
             $stmt->execute($params);
             $results = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
             
+            // 'falta' es el valor oficial desde oct-2026; se suman restos
+            // legados de 'ausencia' (registros antiguos ya renombrados en BD).
+            $faltas = ($results['falta'] ?? 0) + ($results['ausencia'] ?? 0);
             return [
-                'atraso' => $results['atraso'] ?? 0,
+                'atraso'   => $results['atraso'] ?? 0,
                 'licencia' => $results['licencia'] ?? 0,
-                'ausencia' => $results['ausencia'] ?? 0,
-                'total' => array_sum($results),
+                'falta'    => $faltas,
+                'total'    => array_sum($results),
             ];
         } catch (\PDOException $e) {
             error_log("Event getStatistics() error: " . $e->getMessage());
-            return ['atraso' => 0, 'licencia' => 0, 'ausencia' => 0, 'total' => 0];
+            return ['atraso' => 0, 'licencia' => 0, 'falta' => 0, 'total' => 0];
         }
     }
 }

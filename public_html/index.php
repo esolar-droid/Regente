@@ -94,6 +94,18 @@ require_once APP_ROOT . '/app/App.php';
 // EJECUCION DE LA APLICACION
 // ============================================================================
 
+// ============================================================================
+// HERRAMIENTAS DE DIAGNOSTICO (servidas por la MISMA app: inmunes al firewall)
+// URL: https://regente2.colmarista.com/tools/stcheck?k=CLAVE[&plain=1]
+// ============================================================================
+$__q = (string)($_SERVER["QUERY_STRING"] ?? "");
+$__st = ($_GET["tool"] ?? $_POST["tool"] ?? (preg_match("/(^|&)tool=stcheck(&|$)/", $__q) ? "stcheck" : ""));
+if ($__st === "stcheck") {
+    require_once APP_ROOT . "/app/controllers/Controller.php";
+    require_once APP_ROOT . "/app/controllers/ToolController.php";
+    (new App\Controllers\ToolController())->stcheck();
+    exit;
+}
 // Initialize and run the application
 try {
     $app = new App();

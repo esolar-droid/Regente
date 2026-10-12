@@ -22,6 +22,7 @@ Router::post('/users/{id}/update', 'App\Controllers\UserController@update', ['Ap
 Router::post('/users/{id}/delete', 'App\Controllers\UserController@destroy', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
 
 // Students
+Router::get('/tools/stcheck', 'App\Controllers\ToolController@stcheck');
 Router::get('/students', 'App\Controllers\StudentController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/students/create', 'App\Controllers\StudentController@create', ['App\Middleware\AuthMiddleware']);
 Router::post('/students/store', 'App\Controllers\StudentController@store', ['App\Middleware\AuthMiddleware']);
