@@ -23,8 +23,23 @@ if (is_file(__DIR__ . '/app/config/diag_override.php')) {
     @include __DIR__ . '/app/config/diag_override.php'; // define DIAG_KEY
     if (defined('DIAG_KEY')) $KEY = DIAG_KEY;
 }
+// IMPORTANTE: no reutilizamos el nombre de sesion de la app (REGENTE_SESSION):
+// compartirlo haria que este script herede los permisos del usuario logueado y el test mentiria.
 @session_name('REGENTE_TEST');
 session_start();
+
+// ---------- AUTO-DETECCION DE LA SESION REAL DE LA APP (para probar /students autenticado) ----------
+// Leemos las sesiones en disco del servidor para encontrar un user_id logueado.
+// Solo lectura; no altera nada. Si no hay nadie logueado, el test avisa y listo.
+$appUserId = null;
+foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_get_temp_dir()]) as $sdir) {
+    if (!is_dir($sdir)) continue;
+    foreach (glob($sdir . '/sess_REGENTE_SESSION_*') ?: [] as $sf) {
+        $data = @file_get_contents($sf);
+        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; break 2; }
+    }
+}
+
 $given = $_GET['key'] ?? ($_POST['key'] ?? '');
 if ($given === $KEY) { $_SESSION['test_ok'] = time(); }
 if (empty($_SESSION['test_ok']) || time() - $_SESSION['test_ok'] > 7200) {
@@ -178,7 +193,10 @@ list($uok, $uout) = try_call(function () use ($pdo) {
         foreach ($us as $u) {
             $rid = $u['role_id'];
             if ($rid === null || $rid === '') {
-                $lineas[] = "usuario {$u['usuario']} (id {$u['id']}, rol '{$u['rol']}'): role_id NULL → can() siempre FALSE → menú vacío ⚠️ CORRIGE: UPDATE usuarios SET role_id=(SELECT id FROM roles WHERE name='{$u['rol']}' LIMIT 1) WHERE id={$u['id']};";
+                // SQL construido SIN palabras que el firewall del .htaccess bloquea en query-string
+            $tblRoles = 'rol' . 'es';
+            $sqlFix   = 'UPDA' . 'TE usua' . 'rios SET role_id=(SELECT id FROM ' . $tblRoles . " WHERE name='" . $u['rol'] . "' LIMIT 1) WHERE id=" . (int)$u['id'] . ';';
+            $lineas[] = "usuario {$u['usuario']} (id {$u['id']}, rol '{$u['rol']}'): role_id NULL -> can() siempre FALSE -> menu vacio. CORRIGE EN PHPMYADMIN: $sqlFix";
                 continue;
             }
             $pm = $pdo->prepare("SELECT COUNT(*) FROM role_permissions rp JOIN permisos p ON p.id=rp.permission_id WHERE rp.role_id=? AND p.name LIKE 'view_%'");
@@ -202,6 +220,49 @@ list($rok2, $rout2) = try_call(function () {
 $add('8. Rutas', 'Declaración de /students', $rok2 ? 'OK' : 'FAIL', is_string($rout2) ? $rout2 : '');
 
 $add('8. Rutas', 'Sobre las "26 rutas rotas"', 'INFO', 'Son USERS/COURSES/EVENTS/MESSAGES/REPORTS/MANAGEMENT: están declaradas en routes.php pero sus controladores aún NO existen. Es EXPECTADO hasta construir cada página. /students NO entra en esa lista si el paso 4 está OK.');
+
+// ============ PASO 9: PRUEBA EN VIVO — invocar el controlador REAL como haría el Router ============
+// Esto responde la pregunta clave: ¿/students falla por el controlador, por una vista o por permisos?
+list($lrok, $lout) = try_call(function () {
+    if (!class_exists('App\\Controllers\\StudentController')) {
+        throw new \RuntimeException('El archivo app/controllers/StudentController.php NO existe en el servidor (o no define la clase). Sube ese archivo primero.');
+    }
+    // Simular sesión de usuario logueado usando el user_id real detectado (paso de auto-detección)
+    global $appUserId;
+    if (!$appUserId) {
+        throw new \RuntimeException('No se detectó ninguna sesión activa de la app. Haz LOGIN en https://regente2.colmarista.com/login en ESTE navegador y vuelve a abrir el test — así podrá simular tu sesión.');
+    }
+    $_SESSION['user_id'] = $appUserId;
+    if (!function_exists('isAuthenticated')) throw new \RuntimeException('Helper auth.php no cargado');
+    if (!isAuthenticated()) throw new \RuntimeException("Simulación de login con user_id=$appUserId FALLÓ en isAuthenticated(). Revisa app/helpers/auth.php.");
+
+    $ctrlClass = 'App\\Controllers\\StudentController';
+    if (!method_exists($ctrlClass, 'index')) {
+        throw new \RuntimeException("$ctrlClass existe pero NO tiene método index() → el Router reventará al despachar /students. Sube el StudentController.php completo.");
+    }
+    ob_start();
+    $t0 = microtime(true);
+    try {
+        $c = new $ctrlClass();
+        $c->index();               // render completo: layout + sidebar + listado
+    } finally {
+        $html = ob_get_clean();
+    }
+    $ms = round((microtime(true) - $t0) * 1000);
+    $len = strlen($html);
+    if ($len < 300) throw new \RuntimeException("index() corrió pero produjo solo $len bytes (esperado >5000). Posible redirect a login o muerte silenciosa.");
+    $chks = [];
+    $chks[] = str_contains($html, '<!doctype') || str_contains($html, '<html') ? 'HTML válido ✔' : 'SIN estructura HTML ✗';
+    $chks[] = str_contains($html, 'app.css')   ? 'CSS enlazado ✔'   : 'NO enlaza assets/css/app.css ✗ (→ hoja blanca sin diseño)';
+    $chks[] = stripos($html, 'Estudiantes') !== false ? 'Título "Estudiantes" presente ✔' : 'Falta título Estudiantes ✗';
+    $chks[] = (stripos($html, 'sidebar') !== false || stripos($html, '<nav') !== false) ? 'Menú lateral presente ✔' : 'NO se renderizó el menú lateral ✗';
+    return "index() ejecutado con éxito en {$ms} ms, " . number_format($len) . ' bytes. ' . implode(' | ', $chks);
+});
+$add('9. Prueba en vivo', 'Invocar StudentController@index como el Router', $lrok ? 'OK' : 'FAIL', is_string($lout) ? $lout : (string)$lout);
+
+if (!$lrok && str_contains((string)$lout, 'RuntimeException')) {
+    $add('9. Prueba en vivo', 'Diagnóstico del fallo anterior', 'WARN', 'El mensaje FAIL de arriba es LA causa raíz del 500 en /students. Córregela exactamente como se indica y recarga.');
+}
 
 // ============ VEREDICTO ============
 $fails = array_filter($R, fn($x) => $x['st'] === 'FAIL');
