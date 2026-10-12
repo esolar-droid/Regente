@@ -43,8 +43,16 @@ foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_g
 // Si el navegador trae la cookie de sesion de la app, esa es la sesion del usuario logueado (prioridad)
 $appCookieName = 'REGENTE_SESSION';
 if (is_file(__DIR__ . '/app/config/security.php')) {
-    $sec = @include __DIR__ . '/app/config/security.php';
-    if (is_array($sec) && !empty($sec['SESSION_NAME'])) $appCookieName = $sec['SESSION_NAME'];
+    $__sec = @include __DIR__ . '/app/config/security.php';
+    if (is_array($__sec)) {
+        foreach ([['SESSION_NAME'], ['session','name'], ['session_name']] as $__path) {
+            $__v = $__sec; $__ok = true;
+            foreach ($__path as $__k) { if (is_array($__v) && array_key_exists($__k, $__v)) { $__v = $__v[$__k]; } else { $__ok = false; break; } }
+            if ($__ok && is_string($__v) && $__v !== '') { $appCookieName = $__v; break; }
+        }
+    } elseif ($__sec === 1 || $__sec === true) { // security.php que define constantes en lugar de devolver array
+        if (defined('SESSION_NAME')) $appCookieName = SESSION_NAME;
+    }
 }
 if (!empty($_COOKIE[$appCookieName])) {
     $sf = false;
