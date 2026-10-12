@@ -100,6 +100,7 @@ require_once APP_ROOT . '/app/App.php';
 // ============================================================================
 $__q = (string)($_SERVER["QUERY_STRING"] ?? "");
 $__st = ($_GET["tool"] ?? $_POST["tool"] ?? (preg_match("/(^|&)tool=stcheck(&|$)/", $__q) ? "stcheck" : ""));
+if ($__st === "" && strpos($_SERVER["REQUEST_URI"] ?? "", "tools/stcheck") !== false) { $__st = "stcheck"; }
 if ($__st === "stcheck") {
     require_once APP_ROOT . "/app/controllers/Controller.php";
     require_once APP_ROOT . "/app/controllers/ToolController.php";
