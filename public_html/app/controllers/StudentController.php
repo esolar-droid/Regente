@@ -16,10 +16,9 @@ use App\Middleware\CsrfMiddleware;
 
 class StudentController extends Controller {
 
-    /** Permiso para editar fichas. Admin/regente lo reciben via migracion 001;
-     *  ademas isAdmin()/isRegente() siempre permite (fallback sin BD de permisos). */
+    /** Permiso para editar fichas: admin o roles con create/edit student. */
     private function canEdit() {
-        return isAdmin() || isRegente() || can('students.edit');
+        return isAdmin() || can('create_student') || can('edit_student');
     }
 
     private function requireEditPermission() {
@@ -45,7 +44,7 @@ class StudentController extends Controller {
 
         $result  = Student::filter($filters);
         $counts  = Student::stateCounts();
-        $courses = Course::all();
+        $courses = Course::orderBy('curso');
         $birthdays = method_exists(Student::class, 'birthdaysToday') ? Student::birthdaysToday() : [];
 
         $this->view('students/index', [
@@ -106,7 +105,7 @@ class StudentController extends Controller {
         $this->view('students/form', [
             'csrf_token' => CsrfMiddleware::generateToken(),
             'student'    => null,
-            'courses'    => Course::all(),
+            'courses'    => Course::orderBy('curso'),
             'mode'       => 'create',
         ]);
     }
@@ -175,7 +174,7 @@ class StudentController extends Controller {
         $this->view('students/form', [
             'csrf_token' => CsrfMiddleware::generateToken(),
             'student'    => $student,
-            'courses'    => Course::all(),
+            'courses'    => Course::orderBy('curso'),
             'mode'       => 'edit',
         ]);
     }

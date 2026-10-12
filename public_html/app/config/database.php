@@ -7,7 +7,7 @@
  */
 
 define('DB_HOST', 'localhost');
-define('DB_NAME', 'rege_colmarista2');
+define('DB_NAME', 'regente_test');
 define('DB_USER', 'rege_colmarista2');
 define('DB_PASS', 'Marsupiales-2026');
 define('DB_CHARSET', 'utf8mb4');
