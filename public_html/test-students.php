@@ -32,19 +32,38 @@ session_start();
 // Leemos las sesiones en disco del servidor para encontrar un user_id logueado.
 // Solo lectura; no altera nada. Si no hay nadie logueado, el test avisa y listo.
 $appUserId = null;
+$appSessionRaw = null;
 foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_get_temp_dir()]) as $sdir) {
     if (!is_dir($sdir)) continue;
     foreach (glob($sdir . '/sess_REGENTE_SESSION_*') ?: [] as $sf) {
         $data = @file_get_contents($sf);
-        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; break 2; }
+        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; $appSessionRaw = $data; break 2; }
+    }
+}
+// Si el navegador trae la cookie de sesion de la app, esa es la sesion del usuario logueado (prioridad)
+$appCookieName = 'REGENTE_SESSION';
+if (is_file(__DIR__ . '/app/config/security.php')) {
+    $sec = @include __DIR__ . '/app/config/security.php';
+    if (is_array($sec) && !empty($sec['SESSION_NAME'])) $appCookieName = $sec['SESSION_NAME'];
+}
+if (!empty($_COOKIE[$appCookieName])) {
+    $sf = false;
+    foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_get_temp_dir()]) as $sdir) {
+        if (is_file($sdir . '/sess_' . $appCookieName . '_' . $_COOKIE[$appCookieName])) { $sf = $sdir . '/sess_' . $appCookieName . '_' . $_COOKIE[$appCookieName]; break; }
+    }
+    if ($sf) {
+        $data = @file_get_contents($sf);
+        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; $appSessionRaw = $data; }
     }
 }
 
-$given = $_GET['key'] ?? ($_POST['key'] ?? '');
+// La clave SOLO se envia por POST (nunca por ?key=... porque las reglas anti-inyeccion
+// del .htaccess bloquean query strings que contienen patrones como '--').
+$given = $_POST['key'] ?? '';
 if ($given === $KEY) { $_SESSION['test_ok'] = time(); }
 if (empty($_SESSION['test_ok']) || time() - $_SESSION['test_ok'] > 7200) {
     http_response_code(401);
-    if (($_SERVER['REQUEST_METHOD'] ?? '') === 'GET' && $given !== '') { http_response_code(403); }
+
     echo '<!doctype html><meta charset="utf-8"><title>Test Students</title>
     <body style="font-family:system-ui;background:#0f172a;color:#e2e8f0;display:flex;justify-content:center;padding-top:10vh">
     <form method="post" style="background:#1e293b;padding:2rem;border-radius:12px;min-width:320px">
@@ -59,7 +78,7 @@ if (empty($_SESSION['test_ok']) || time() - $_SESSION['test_ok'] > 7200) {
 // ---------- INFRA ----------
 $R = [];          // resultados: [seccion, titulo, estado, detalle]
 $add = function ($sec, $tit, $st, $det = '') use (&$R) { $R[] = compact('sec', 'tit', 'st', 'det'); };
-$plain = isset($_GET['plain']);
+$plain = isset($_POST['plain']);
 
 function try_call(callable $fn): array {
     try { return [true, $fn()]; }
@@ -299,7 +318,7 @@ $col = ['OK' => '#16a34a', 'FAIL' => '#dc2626', 'WARN' => '#d97706', 'INFO' => '
 </style></head><body><div class="wrap">
 <h1>🧪 Test específico · Módulo Estudiantes <small>(<?= date('d/m/Y H:i') ?>)</small></h1>
 <div class="verd">VEREDICTO: <?= htmlspecialchars($verdict) ?></div>
-<p><button onclick="copyRep()">📋 Copiar informe</button> <a href="?plain=1&key=<?= htmlspecialchars($_GET['key'] ?? '') ?>" style="margin-left:1rem">Versión texto plano</a></p>
+<p><button onclick="copyRep()">📋 Copiar informe</button> <form method="post" style="display:inline"><input type="hidden" name="plain" value="1"><button style="margin-left:1rem">Versión texto plano</button></form></p>
 <pre id="rep" style="display:none"><?= htmlspecialchars("TEST STUDENTS " . date('Y-m-d H:i') . " VEREDICTO: $verdict\n" . implode("\n", array_map(fn($x) => "[{$x['st']}] {$x['sec']} / {$x['tit']}: {$x['det']}", $R))) ?></pre>
 <?php
 $last = '';
