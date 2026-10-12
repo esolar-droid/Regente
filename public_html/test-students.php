@@ -33,40 +33,64 @@ session_start();
 // Solo lectura; no altera nada. Si no hay nadie logueado, el test avisa y listo.
 $appUserId = null;
 $appSessionRaw = null;
-foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_get_temp_dir()]) as $sdir) {
-    if (!is_dir($sdir)) continue;
+$sessDirs = array_values(array_filter(array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: '', rtrim(ini_get('session.save_path') ?: '', '/1234567890')])));
+$sessDirs[] = '/tmp';
+$sessDirs = array_values(array_filter(array_unique($sessDirs), 'is_dir'));
+$cand = [];
+foreach ($sessDirs as $sdir) {
     foreach (glob($sdir . '/sess_REGENTE_SESSION_*') ?: [] as $sf) {
         $data = @file_get_contents($sf);
-        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; $appSessionRaw = $data; break 2; }
+        if ($data && preg_match_all('/(?:^|\|)user_id\|i:(\d+)/', $data, $mmP)) {
+            foreach ($mmP[1] as $uid) $cand[] = [$uid, filemtime($sf), $data];
+        }
     }
 }
-// Si el navegador trae la cookie de sesion de la app, esa es la sesion del usuario logueado (prioridad)
+// preferir la sesion mas reciente y cuyo user_id EXISTA en la BD
+if ($cand) {
+    usort($cand, fn($a, $b) => $b[1] <=> $a[1]);
+    try {
+        require_once __DIR__ . '/app/config/database.php';
+        $pdoFn = function_exists('getDB') ? 'getDB' : (function_exists('db') ? 'db' : null);
+        $pdoTest = null;
+        if ($pdoFn) { $pdoTest = @$pdoFn(); }
+        if (!$pdoTest && class_exists('Database')) { $pdoTest = @Database::getInstance(); }
+        foreach ($cand as $c) {
+            $uid = (int)$c[0];
+            if ($pdoTest) {
+                $st = @$pdoTest->prepare('SELECT COUNT(*) FROM usuarios WHERE id=?');
+                if ($st) { $st->execute([$uid]); if ((int)$st->fetchColumn() > 0) { $appUserId = $uid; $appSessionRaw = $c[2]; break; } }
+            } else { $appUserId = $uid; $appSessionRaw = $c[2]; break; }
+        }
+    } catch (\Throwable $e) { /* seguimos sin pdo */ }
+    if (!$appUserId && $cand) { $appUserId = (int)$cand[0][0]; $appSessionRaw = $cand[0][2]; } // ultimo recurso: uid mas reciente
+}
+// Detectar nombre real de la cookie de sesion de la app (lea session_name() del config, con fallbacks)
 $appCookieName = 'REGENTE_SESSION';
+$__sn = '';
 if (is_file(__DIR__ . '/app/config/security.php')) {
-    $__sec = @include __DIR__ . '/app/config/security.php';
-    if (is_array($__sec)) {
+    ob_start(); $__sec = @include __DIR__ . '/app/config/security.php'; ob_end_clean();
+    if (defined('SESSION_NAME')) $__sn = SESSION_NAME;
+    elseif (is_array($__sec)) {
         foreach ([['SESSION_NAME'], ['session','name'], ['session_name']] as $__path) {
             $__v = $__sec; $__ok = true;
             foreach ($__path as $__k) { if (is_array($__v) && array_key_exists($__k, $__v)) { $__v = $__v[$__k]; } else { $__ok = false; break; } }
-            if ($__ok && is_string($__v) && $__v !== '') { $appCookieName = $__v; break; }
+            if ($__ok && is_string($__v) && $__v !== '') { $__sn = $__v; break; }
         }
-    } elseif ($__sec === 1 || $__sec === true) { // security.php que define constantes en lugar de devolver array
-        if (defined('SESSION_NAME')) $appCookieName = SESSION_NAME;
     }
 }
+if ($__sn !== '') $appCookieName = $__sn;
 if (!empty($_COOKIE[$appCookieName])) {
-    $sf = false;
-    foreach (array_unique([sys_get_temp_dir(), ini_get('session.save_path') ?: sys_get_temp_dir()]) as $sdir) {
-        if (is_file($sdir . '/sess_' . $appCookieName . '_' . $_COOKIE[$appCookieName])) { $sf = $sdir . '/sess_' . $appCookieName . '_' . $_COOKIE[$appCookieName]; break; }
-    }
-    if ($sf) {
-        $data = @file_get_contents($sf);
-        if ($data && preg_match('/user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; $appSessionRaw = $data; }
+    $sid = preg_replace('/[^a-zA-Z0-9,.-]/', '', $_COOKIE[$appCookieName]);
+    foreach ($sessDirs as $sdir) {
+        $f = $sdir . '/sess_' . $appCookieName . '_' . $sid;
+        if (is_file($f)) {
+            $data = @file_get_contents($f);
+            if ($data && preg_match('/(?:^|\|)user_id\|i:(\d+)/', $data, $mm)) { $appUserId = (int)$mm[1]; $appSessionRaw = $data; }
+            break;
+        }
     }
 }
 
-// La clave SOLO se envia por POST (nunca por ?key=... porque las reglas anti-inyeccion
-// del .htaccess bloquean query strings que contienen patrones como '--').
 $given = $_POST['key'] ?? '';
 if ($given === $KEY) { $_SESSION['test_ok'] = time(); }
 if (empty($_SESSION['test_ok']) || time() - $_SESSION['test_ok'] > 7200) {
