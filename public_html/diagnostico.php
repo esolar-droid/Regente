@@ -506,17 +506,36 @@ Diag::run('Conexion PDO', function () use (&$db) {
 if ($db instanceof PDO) {
     Diag::check('Version de MySQL/MariaDB', 'info', trim($db->query('SELECT VERSION()')->fetchColumn()));
 
-    // --- Esquema esperado segun los modelos de la aplicacion ---
+    // --- Esquema esperado segun los modelos de la aplicacion y sus consultas SQL ---
     $expectedTables = [
-        'usuarios'           => 'login del sistema (App\Models\User)',
-        'roles'              => 'roles de usuarios (App\Models\Role)',
-        'permisos'           => 'permisos granulares (App\Models\Permission)',
-        'role_permissions'   => 'pivot rol<->permiso (App\Models\Role)',
-        'gestion'            => 'anios escolares (App\Models\Management)',
-        'cursos'             => 'cursos (App\Models\Course)',
-        'estudiantes'        => 'estudiantes (App\Models\Student)',
-        'eventos'            => 'atrasos/faltas/licencias (App\Models\Event)',
-        'mensajes_enviados'  => 'historial de WhatsApp (App\Models\Message)',
+        'usuarios'             => 'login del sistema (App\Models\User)',
+        'roles'                => 'roles de usuarios (App\Models\Role)',
+        'permisos'             => 'permisos granulares (App\Models\Permission)',
+        'role_permissions'     => 'pivot rol<->permiso (App\Models\Role)',
+        'gestion'              => 'anios escolares (App\Models\Management)',
+        'cursos'               => 'cursos (App\Models\Course)',
+        'estudiantes'          => 'estudiantes (App\Models\Student)',
+        'eventos'              => 'atrasos/faltas/licencias (App\Models\Event)',
+        'mensajes_enviados'    => 'historial de WhatsApp (App\Models\Message)',
+        'estudiante_estados'   => 'historial de estados academicos (App\Models\Student + migracion 001)',
+    ];
+
+    // Columnas exigidas por las consultas reales de los modelos (no especulativas)
+    $expectedColumns = [
+        'usuarios'           => ['id', 'nombre', 'apellido', 'usuario', 'contrasena', 'rol', 'role_id', 'estado'],
+        'roles'              => ['id', 'name'],
+        'permisos'           => ['id', 'name', 'description'],
+        'role_permissions'   => ['role_id', 'permission_id'],
+        'gestion'            => ['id', 'anio', 'estado'],
+        'cursos'             => ['id', 'nivel', 'grado', 'paralelo', 'curso'],
+        'estudiantes'        => ['id', 'nombre_completo', 'codigo_bnb', 'id_curso', 'id_gestion',
+                                 'telefono_estudiante', 'telefono_papa', 'telefono_mama',
+                                 'fecha_nacimiento', 'estado', 'fecha_ini', 'fecha_fin'],
+        'eventos'            => ['id', 'id_estudiante', 'tipo_evento', 'fecha_evento',
+                                 'justificacion', 'id_usuario_registro', 'fecha_registro'],
+        'mensajes_enviados'  => ['id', 'id_estudiante', 'destinatario', 'mensaje',
+                                 'id_usuario_envio', 'fecha_envio'],
+        'estudiante_estados' => ['id', 'id_estudiante', 'estado', 'fecha_ini', 'fecha_fin', 'motivo', 'id_usuario'],
     ];
 
     $existing = $db->query('SHOW TABLES')->fetchAll(PDO::FETCH_COLUMN);
@@ -526,21 +545,14 @@ if ($db instanceof PDO) {
     foreach ($expectedTables as $t => $desc) {
         if (in_array(strtolower($t), $existingLower, true)) {
             Diag::check("Tabla '$t'", 'pass', "Existe — necesaria para: $desc");
+        } elseif ($t === 'estudiante_estados') {
+            Diag::check("Tabla '$t'", 'fail', "NO EXISTE — necesaria para: $desc",
+                'Ejecuta database/migrations/001_estados_estudiantes.sql en phpMyAdmin (es idempotente).');
         } else {
             Diag::check("Tabla '$t'", 'fail', "NO EXISTE — necesaria para: $desc", 'Los modelos que la consultan daran error SQL. Crearla o importar el SQL de estructura.');
         }
     }
 
-    // Columnas criticas esperadas por las consultas existentes en los modelos
-    $expectedColumns = [
-        'usuarios'          => ['id', 'nombre', 'apellido', 'usuario', 'contrasena', 'rol', 'role_id', 'estado'],
-        'estudiantes'       => ['id', 'nombre_completo', 'codigo_bnb', 'id_curso', 'id_gestion'],
-        'eventos'           => ['id', 'id_estudiante', 'tipo_evento', 'fecha_evento'],
-        'mensajes_enviados' => ['id', 'id_estudiante', 'destinatario', 'fecha_envio'],
-        'gestion'           => ['id', 'estado'],
-        'permisos'          => ['id', 'name'],
-        'role_permissions'  => ['role_id', 'permission_id'],
-    ];
     foreach ($expectedColumns as $table => $cols) {
         if (!in_array(strtolower($table), $existingLower, true)) continue;
         Diag::run("Columnas de '$table'", function () use ($db, $table, $cols) {
@@ -549,8 +561,87 @@ if ($db instanceof PDO) {
             $real = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
             $faltan = array_values(array_diff($cols, $real));
             if (!$faltan) return ['pass', count($real) . ' columnas; presentes todas las esperadas (' . implode(', ', $cols) . ')'];
-            return ['fail', 'FALTAN: ' . implode(', ', $faltan) . "\nReales: " . implode(', ', $real),
+            $hint = ($table === 'estudiantes' && array_intersect($faltan, ['fecha_nacimiento','estado','fecha_ini','fecha_fin']))
+                ? ' FALTAN COLUMNAS DE LA MIGRACION 001: ejecutala en phpMyAdmin.' : '';
+            return ['fail', 'FALTAN: ' . implode(', ', $faltan) . "\nReales: " . implode(', ', $real) . $hint,
                     'Las consultas del modelo usan esas columnas: habra errores SQL en vivo. Alinear el esquema o ajustar el modelo.'];
+        });
+    }
+
+    // Integridad referencial: columnas FK usadas en JOINs deben tener indice
+    $fkMap = [
+        'estudiantes'        => ['id_curso' => 'cursos', 'id_gestion' => 'gestion'],
+        'eventos'            => ['id_estudiante' => 'estudiantes'],
+        'mensajes_enviados'  => ['id_estudiante' => 'estudiantes'],
+        'estudiante_estados' => ['id_estudiante' => 'estudiantes', 'id_usuario' => 'usuarios'],
+    ];
+    foreach ($fkMap as $table => $fks) {
+        if (!in_array(strtolower($table), $existingLower, true)) continue;
+        Diag::run("Indices/FK de '$table'", function () use ($db, $table, $fks) {
+            $stmt = $db->prepare('SELECT COLUMN_NAME FROM information_schema.STATISTICS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ?');
+            $stmt->execute([$table]);
+            $indexed = array_map('strtolower', $stmt->fetchAll(PDO::FETCH_COLUMN));
+            $sinIdx = [];
+            foreach ($fks as $col => $ref) {
+                if (!in_array(strtolower($col), $indexed, true)) $sinIdx[] = "$col (-> $ref)";
+            }
+            if (!$sinIdx) return ['pass', 'Indice presente en: ' . implode(', ', array_keys($fks))];
+            return ['warn', 'Sin indice en: ' . implode(', ', $sinIdx),
+                'Los JOINs seran lentos con muchos registros. Sugerido: ALTER TABLE `' . $table . '` ADD INDEX (`' . explode(' ', $sinIdx[0])[0] . '`).'];
+        });
+    }
+
+    // Dominios ENUM: deben cubrir los valores que la app inserta
+    Diag::run("ENUM eventos.tipo_evento", function () use ($db) {
+        $stmt = $db->prepare("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='eventos' AND COLUMN_NAME='tipo_evento'");
+        $stmt->execute();
+        $ct = (string)$stmt->fetchColumn();
+        if ($ct === '') return ['warn', 'Columna tipo_evento inexistente (ver prueba de columnas)'];
+        preg_match_all("/'([^']+)'/", $ct, $m);
+        $vals = array_map('strtolower', $m[1] ?? []);
+        $missing = array_diff(['atraso', 'falta', 'licencia'], $vals);
+        return $missing
+            ? ['fail', 'ENUM actual: ' . implode(', ', $vals), 'La app registra atraso/falta/licencia. Falta(n): ' . implode(', ', $missing) . '. Corregir con ALTER TABLE eventos MODIFY tipo_evento ENUM(...).']
+            : ['pass', 'Cubre atraso/falta/licencia (' . implode(', ', $vals) . ')'];
+    });
+    Diag::run("ENUM estudiantes.estado", function () use ($db) {
+        $stmt = $db->prepare("SELECT COLUMN_TYPE FROM information_schema.COLUMNS WHERE TABLE_SCHEMA=DATABASE() AND TABLE_NAME='estudiantes' AND COLUMN_NAME='estado'");
+        $stmt->execute();
+        $ct = (string)$stmt->fetchColumn();
+        if ($ct === '') return ['warn', 'Columna "estado" no existe aun — pendiente migracion 001'];
+        preg_match_all("/'([^']+)'/", $ct, $m);
+        $vals = array_map('strtolower', $m[1] ?? []);
+        $need = ['regular', 'retirado', 'receso_medico', 'receso_pedagogico', 'receso_administrativo', 'asistencia_virtual'];
+        $missing = array_diff($need, $vals);
+        return $missing
+            ? ['warn', 'ENUM actual: ' . implode(', ', $vals), 'Faltan valores usados por Student::cambiarEstado(): ' . implode(', ', $missing) . '. Ejecuta la migracion 001 (idempotente).']
+            : ['pass', 'Cubre los 6 estados academicos del sistema'];
+    });
+
+    // Gestion escolar activa: listados de estudiantes y dashboard dependen de ella
+    if (in_array('gestion', $existingLower, true)) {
+        Diag::run("Gestion escolar activa", function () use ($db) {
+            try {
+                $activas = $db->query("SELECT id, anio FROM gestion WHERE estado = 'activa'")->fetchAll(PDO::FETCH_ASSOC);
+            } catch (PDOException $e) {
+                return ['fail', 'Consulta fallo: ' . $e->getMessage(), '¿Faltan columnas "anio" o "estado" en gestion?'];
+            }
+            if (count($activas) === 0) return ['warn', '0 gestiones activas', 'El listado de estudiantes activos estara vacio. Define el anio escolar vigente (gestion.estado = "activa").'];
+            if (count($activas) > 1) return ['warn', count($activas) . ' gestiones activas simultaneas (' . implode(', ', array_column($activas, 'anio')) . ')', 'Deja UNA sola gestion "activa" para evitar duplicados en listados y reportes.'];
+            return ['pass', 'Gestion activa: anio ' . $activas[0]['anio'] . ' (id ' . $activas[0]['id'] . ')'];
+        });
+    }
+
+    // Coherencia entre la columna estado y la hoja de historial
+    if (in_array('estudiante_estados', $existingLower, true) && in_array('estudiantes', $existingLower, true)) {
+        Diag::run("Coherencia estudiantes <-> estudiante_estados", function () use ($db) {
+            $sinHistorial = (int)$db->query("SELECT COUNT(*) FROM estudiantes e WHERE NOT EXISTS (SELECT 1 FROM estudiante_estados h WHERE h.id_estudiante = e.id)")->fetchColumn();
+            $vigentesMal  = (int)$db->query("SELECT COUNT(*) FROM estudiante_estados h JOIN estudiantes e ON e.id = h.id_estudiante WHERE h.fecha_fin IS NULL AND h.estado <> e.estado")->fetchColumn();
+            $msg = [];
+            if ($sinHistorial > 0) $msg[] = "$sinHistorial estudiante(s) SIN asiento en historial";
+            if ($vigentesMal > 0)  $msg[] = "$vigentesMal asiento(s) vigente en desacuerdo con estudiantes.estado";
+            if (!$msg) return ['pass', 'Historial completo y coherente con la columna estado'];
+            return ['warn', implode('; ', $msg), 'Re-ejecuta el paso 3 (sembrado idempotente) de la migracion 001 o sincroniza manualmente.'];
         });
     }
 

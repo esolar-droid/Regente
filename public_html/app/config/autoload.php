@@ -108,6 +108,7 @@ require_once APP_ROOT . '/app/helpers/permissions.php';
 require_once APP_ROOT . '/app/helpers/validation.php';
 require_once APP_ROOT . '/app/helpers/sanitize.php';
 require_once APP_ROOT . '/app/helpers/recaptcha.php';
+require_once APP_ROOT . '/app/helpers/states.php';
 
 // ============================================================================
 // CARGA EXPLICITA DE CLASSES BASE (para evitar problemas de herencia)
