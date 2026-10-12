@@ -171,8 +171,8 @@ ob_start();
                                                     <small class="has-text-grey">Código: <?= htmlspecialchars($event->student_code) ?></small>
                                                 </td>
                                                 <td>
-                                                    <span class="tag is-<?= $this->getEventTagClass($event->tipo_evento) ?>">
-                                                        <?= htmlspecialchars(ucfirst($event->tipo_evento)) ?>
+                                                    <span class="tag is-<?= event_tag_class($event->tipo_evento) ?>">
+                                                        <?= htmlspecialchars(event_label($event->tipo_evento)) ?>
                                                     </span>
                                                 </td>
                                                 <td><?= htmlspecialchars($event->justificacion ?? '-') ?></td>

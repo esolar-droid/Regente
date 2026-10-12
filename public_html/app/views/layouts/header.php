@@ -1,6 +1,10 @@
 <header>
     <nav class="navbar is-fixed-top" role="navigation" aria-label="main navigation">
         <div class="navbar-brand">
+            <a role="button" class="navbar-item sidebar-toggle" id="sidebarToggle"
+               aria-label="Alternar menú lateral" title="Menú">
+                <i class="fas fa-bars"></i>
+            </a>
             <a class="navbar-item" href="/dashboard">
                 <img src="https://colmarista.com/wp-content/uploads/2026/10/logohorizontal.png" 
                      alt="Colegio Marista" 

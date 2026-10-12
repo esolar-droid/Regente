@@ -455,3 +455,138 @@ body {
 .has-border-danger {
     border-color: var(--secondary-3);
 }
+
+/* ==========================================================================
+   Sidebar (menú lateral)
+   ========================================================================== */
+.app-shell {
+    display: flex;
+    min-height: 100vh;
+    padding-top: 3.25rem; /* altura del navbar fijo */
+}
+
+.sidebar {
+    position: fixed;
+    top: 3.25rem;
+    left: 0;
+    bottom: 0;
+    width: 240px;
+    background-color: var(--primary-1);
+    color: #fff;
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+    transition: transform 0.25s ease;
+    z-index: 30;
+    box-shadow: 2px 0 6px rgba(0, 0, 0, 0.15);
+}
+
+.sidebar-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+    color: var(--secondary-2);
+}
+
+.sidebar-nav {
+    flex: 1;
+    padding: 8px 0;
+}
+
+.sidebar-section-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: rgba(255, 255, 255, 0.5);
+    padding: 14px 16px 4px;
+    margin: 0;
+}
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    color: rgba(255, 255, 255, 0.85);
+    text-decoration: none;
+    font-size: 0.95rem;
+    border-left: 3px solid transparent;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.sidebar-link:hover {
+    background-color: rgba(255, 255, 255, 0.08);
+    color: #fff;
+}
+
+.sidebar-link.is-active {
+    background-color: rgba(243, 146, 0, 0.15);
+    border-left-color: var(--primary-2);
+    color: #fff;
+    font-weight: 600;
+}
+
+.sidebar-badge {
+    margin-left: auto;
+    background-color: var(--primary-2);
+    color: #fff;
+    font-size: 0.65rem;
+    padding: 2px 8px;
+    border-radius: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sidebar-footer {
+    border-top: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 8px 0;
+}
+
+.app-body {
+    flex: 1;
+    margin-left: 240px;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    transition: margin-left 0.25s ease;
+}
+
+.app-body .main-content {
+    padding-top: 0;
+    flex: 1;
+}
+
+/* Botón hamburguesa del sidebar en el navbar */
+.sidebar-toggle {
+    cursor: pointer;
+    color: #fff !important;
+    display: none;
+}
+
+/* Modo colapsado (desktop) */
+body.sidebar-collapsed .sidebar {
+    transform: translateX(-100%);
+}
+body.sidebar-collapsed .app-body {
+    margin-left: 0;
+}
+
+/* Responsive: sidebar oculto por defecto en pantallas pequeñas */
+@media (max-width: 1023px) {
+    .sidebar-toggle {
+        display: flex;
+    }
+    .sidebar {
+        transform: translateX(-100%);
+    }
+    body.sidebar-open .sidebar {
+        transform: translateX(0);
+    }
+    .app-body {
+        margin-left: 0;
+    }
+}

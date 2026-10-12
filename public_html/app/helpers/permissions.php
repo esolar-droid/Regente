@@ -53,3 +53,39 @@ if (!function_exists('hasAnyRole')) {
         return in_array(userRole(), $roles);
     }
 }
+
+if (!function_exists('isProfessor')) {
+    function isProfessor() {
+        return isAuthenticated() && userRole() === 'profesor';
+    }
+}
+
+/**
+ * Devuelve la clase de tag Bulma segun el tipo de evento (asistencia).
+ */
+if (!function_exists('event_tag_class')) {
+    function event_tag_class($tipo) {
+        switch (strtolower((string) $tipo)) {
+            case 'atraso':   return 'info';
+            case 'licencia': return 'warning';
+            case 'ausencia':
+            case 'falta':    return 'danger';
+            default:         return 'light';
+        }
+    }
+}
+
+/**
+ * Etiqueta legible para tipos de evento.
+ */
+if (!function_exists('event_label')) {
+    function event_label($tipo) {
+        switch (strtolower((string) $tipo)) {
+            case 'atraso':   return 'Atraso';
+            case 'licencia': return 'Licencia';
+            case 'ausencia': return 'Falta';
+            case 'salida':   return 'Salida anticipada';
+            default:         return ucfirst((string) $tipo);
+        }
+    }
+}
