@@ -1,0 +1,25 @@
+ENTREGA V3 - SISTEMA REGENTE (subir a public_html/)
+====================================================
+
+PRIORIDAD 1 - ESTOS SON LOS QUE FALTAN Y ROMPEN /students
+(crea la carpeta app/views/students/ y sube estos 3 archivos con EXACTAMENTE estos nombres):
+
+  students_index.php   -> app/views/students/index.php
+  students_show.php    -> app/views/students/show.php
+  students_form.php    -> app/views/students/form.php
+
+  NOTA: en tu servidor quedaron como "students_index.php" etc. El controlador
+  los busca como index.php / show.php / form.php. Renombralos.
+
+PRIORIDAD 2 - REEMPLAZAR (version corregida, sin mensajes de commit incrustados):
+
+  routes.php           -> app/config/routes.php
+  StudentController.php-> app/controllers/StudentController.php
+  states.php           -> app/helpers/states.php
+  Student.php          -> app/models/Student.php
+  sidebar.php          -> app/views/layouts/sidebar.php
+  diagnostico.php      -> diagnostico.php
+
+VERIFICACION FINAL:
+  1) Abre https://regente2.colmarista.com/students  (debe listar los 1526 alumnos)
+  2) Corre diagnostico.php -> rutas rotas debe bajar de 26 a 18

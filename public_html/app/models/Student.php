@@ -82,14 +82,17 @@ class Student extends Model {
             $stmt->execute([$this->id]);
             $results = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
             
+            // 'falta' es el valor oficial; se suman restos legados de 'ausencia' por si acaso.
+            $faltas = ($results['falta'] ?? 0) + ($results['ausencia'] ?? 0);
+
             return [
                 'atraso' => $results['atraso'] ?? 0,
                 'licencia' => $results['licencia'] ?? 0,
-                'ausencia' => $results['ausencia'] ?? 0,
+                'falta' => $faltas,
             ];
         } catch (\PDOException $e) {
             error_log("Student getEventCounts() error: " . $e->getMessage());
-            return ['atraso' => 0, 'licencia' => 0, 'ausencia' => 0];
+            return ['atraso' => 0, 'licencia' => 0, 'falta' => 0];
         }
     }
     
@@ -224,6 +227,37 @@ class Student extends Model {
             return $out;
         } catch (\PDOException $e) {
             error_log("Student stateCounts() error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Agregar de eventos (atraso/falta/licencia) para VARIOS estudiantes en
+     * una sola consulta. 'falta' incluye restos legados de 'ausencia'.
+     * Devuelve [id_estudiante => ['atraso'=>n,'falta'=>n,'licencia'=>n]].
+     */
+    public static function eventCountsForIds(array $ids) {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!$ids) return [];
+        try {
+            $db = \Database::getConnection();
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare(
+                "SELECT id_estudiante, tipo_evento, COUNT(*) c
+                 FROM eventos WHERE id_estudiante IN ($ph)
+                 GROUP BY id_estudiante, tipo_evento"
+            );
+            $stmt->execute($ids);
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $id = (int)$r['id_estudiante'];
+                $out[$id] ??= ['atraso' => 0, 'falta' => 0, 'licencia' => 0];
+                $tipo = $r['tipo_evento'] === 'ausencia' ? 'falta' : $r['tipo_evento'];
+                if (isset($out[$id][$tipo])) $out[$id][$tipo] += (int)$r['c'];
+            }
+            return $out;
+        } catch (\PDOException $e) {
+            error_log("Student eventCountsForIds() error: " . $e->getMessage());
             return [];
         }
     }

@@ -26,8 +26,8 @@
 // APP_ROOT = /home/regente2.colmarista.com/public_html/
 // The app directory is at the same level as this file
 
-define('APP_ROOT', __DIR__);
-define('PUBLIC_ROOT', __DIR__);
+if (!defined('APP_ROOT'))    { define('APP_ROOT', __DIR__); }
+if (!defined('PUBLIC_ROOT')) { define('PUBLIC_ROOT', __DIR__); }
 
 // Error reporting (set to 0 in production)
 error_reporting(E_ALL);

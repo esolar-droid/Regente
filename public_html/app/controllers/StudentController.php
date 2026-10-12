@@ -125,13 +125,23 @@ class StudentController extends Controller {
 
         $gestion = \App\Models\Management::getActive();
 
+        // Normalizar telefonos a formato internacional wa.me (Bolivia +591)
+        $wa = function ($t) {
+            $t = preg_replace('/\D/', '', (string)$t);
+            if ($t === '') return null;
+            if (strlen($t) === 8) return '591' . $t;                      // fijo
+            if (strlen($t) === 9 && $t[0] === '0') return '591' . substr($t, 1); // celular 0X
+            if (strlen($t) >= 11) return ltrim($t, '0');                   // ya con codigo pais
+            return '591' . $t;
+        };
+
         $student = new Student([
             'nombre_completo'    => $p['nombre_completo'],
             'codigo_bnb'         => $p['codigo_bnb'] ?: null,
             'id_curso'           => $p['id_curso'] ?: null,
-            'telefono_estudiante'=> $p['telefono_estudiante'] ?: null,
-            'telefono_papa'      => $p['telefono_papa'] ?: null,
-            'telefono_mama'      => $p['telefono_mama'] ?: null,
+            'telefono_estudiante'=> $wa($p['telefono_estudiante'] ?? ''),
+            'telefono_papa'      => $wa($p['telefono_papa'] ?? ''),
+            'telefono_mama'      => $wa($p['telefono_mama'] ?? ''),
             'id_gestion'         => $gestion ? $gestion->id : null,
             'fecha_nacimiento'   => $p['fecha_nacimiento'] ?: null,
             'estado'             => $p['estado'],
@@ -187,12 +197,21 @@ class StudentController extends Controller {
 
         // Datos personales (el estado se cambia SOLO via change-state para
         // mantener la integridad del historial)
+        $wa = function ($t) {
+            $t = preg_replace('/\D/', '', (string)$t);
+            if ($t === '') return null;
+            if (strlen($t) === 8) return '591' . $t;
+            if (strlen($t) === 9 && $t[0] === '0') return '591' . substr($t, 1);
+            if (strlen($t) >= 11) return ltrim($t, '0');
+            return '591' . $t;
+        };
+
         $student->nombre_completo     = $p['nombre_completo'];
         $student->codigo_bnb          = $p['codigo_bnb'] ?: null;
         $student->id_curso            = $p['id_curso'] ?: null;
-        $student->telefono_estudiante = $p['telefono_estudiante'] ?: null;
-        $student->telefono_papa       = $p['telefono_papa'] ?: null;
-        $student->telefono_mama       = $p['telefono_mama'] ?: null;
+        $student->telefono_estudiante = $wa($p['telefono_estudiante'] ?? '');
+        $student->telefono_papa       = $wa($p['telefono_papa'] ?? '');
+        $student->telefono_mama       = $wa($p['telefono_mama'] ?? '');
         $student->fecha_nacimiento    = $p['fecha_nacimiento'] ?: null;
 
         // Guardar explicitamente solo las columnas editables de datos

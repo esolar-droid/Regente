@@ -25,8 +25,10 @@ Router::post('/users/{id}/delete', 'App\Controllers\UserController@destroy', ['A
 Router::get('/students', 'App\Controllers\StudentController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/students/create', 'App\Controllers\StudentController@create', ['App\Middleware\AuthMiddleware']);
 Router::post('/students/store', 'App\Controllers\StudentController@store', ['App\Middleware\AuthMiddleware']);
+Router::get('/students/{id}', 'App\Controllers\StudentController@show', ['App\Middleware\AuthMiddleware']);
 Router::get('/students/{id}/edit', 'App\Controllers\StudentController@edit', ['App\Middleware\AuthMiddleware']);
 Router::post('/students/{id}/update', 'App\Controllers\StudentController@update', ['App\Middleware\AuthMiddleware']);
+Router::post('/students/{id}/change-state', 'App\Controllers\StudentController@changeState', ['App\Middleware\AuthMiddleware']);
 Router::post('/students/{id}/delete', 'App\Controllers\StudentController@destroy', ['App\Middleware\AuthMiddleware']);
 
 // Courses

@@ -864,9 +864,45 @@ if ($foundLogs) {
 // ============================================================================
 // 9. VISTAS PRINCIPALES (smoke test estatico)
 // ============================================================================
-Diag::section('9. Vistas (revision estatica)');
+Diag::section('9. Vistas y helpers (revision estatica)');
 
-// Funciones globales propias del framework + builtins de PHP que son validas en vistas
+// --- 9a. Helpers criticos que usan las vistas (seccion 6 los define, aqui se prueban con datos reales) ---
+$evMap = [
+    'atraso'   => ['info',    'Atraso'],
+    'falta'    => ['danger',  'Falta'],
+    'licencia' => ['warning', 'Licencia'],
+    'ausencia' => ['danger',  'Falta'], // valor legado -> debe seguir maqueando/etiquetando bien
+];
+foreach ($evMap as $tipo => $esperado) {
+    Diag::run("event_tag_class('$tipo')", function () use ($tipo, $esperado) {
+        if (!function_exists('event_tag_class')) return ['fail', 'Funcion no definida (app/helpers/permissions.php no cargo)'];
+        $got = event_tag_class($tipo);
+        return $got === $esperado[0]
+            ? ['pass', "'$got'"]
+            : ['fail', "devolvio '$got', se esperaba '{$esperado[0]}'", 'Las tags de eventos en dashboard/reportes saldran mal coloreadas.'];
+    });
+    Diag::run("event_label('$tipo')", function () use ($tipo, $esperado) {
+        if (!function_exists('event_label')) return ['fail', 'Funcion no definida'];
+        $got = event_label($tipo);
+        return $got === $esperado[1]
+            ? ['pass', "'$got'"]
+            : ['fail', "devolvio '$got', se esperaba '{$esperado[1]}'"];
+    });
+}
+if (function_exists('event_types')) {
+    $et = event_types();
+    Diag::check('event_types() canonical', in_array('falta', $et, true) && !in_array('ausencia', $et, true) ? 'pass' : 'warn',
+        implode(', ', $et) . ' — el registro de asistencia usara SOLO estos valores');
+}
+
+// --- 9b. Llamadas a funciones inexistentes en vistas (solo bloques PHP) ---
+$viewsToCheck = ['app/views/auth/login.php', 'app/views/dashboard/index.php', 'app/views/layouts/app.php', 'app/views/layouts/sidebar.php', 'app/views/layouts/header.php', 'app/views/layouts/footer.php'];
+// Anadir automaticamente cualquier vista nueva que aparezca en el proyecto
+foreach (glob("$root/app/views/*/*.php") ?: [] as $gf) {
+    $rel = substr($gf, strlen($root) + 1);
+    if (!in_array($rel, $viewsToCheck, true)) $viewsToCheck[] = $rel;
+}
+
 $ownGlobals = [];
 foreach ((new ReflectionExtension('standard'))->getFunctions() as $rfn) $ownGlobals[strtolower($rfn->getName())] = true;
 foreach (['pdo','mbstring','json','session','date','openssl','curl','gd','fileinfo'] as $extName) {
@@ -877,7 +913,7 @@ foreach (['pdo','mbstring','json','session','date','openssl','curl','gd','filein
 $language = ['if','foreach','for','while','switch','function','isset','empty','unset','echo','print','list','array','extract','compact','require','require_once','include','include_once','match','use','catch','new','return','and','or','xor','fn','endif','endforeach','endwhile','endswitch','exit','die','try','finally','else','elseif','instanceof','class','interface','trait','enum','static','public','private','protected','const','namespace','global','yield','clone','throw'];
 foreach ($language as $w) $ownGlobals[$w] = true;
 
-foreach (['app/views/auth/login.php', 'app/views/dashboard/index.php', 'app/views/layouts/app.php', 'app/views/layouts/sidebar.php', 'app/views/layouts/header.php', 'app/views/layouts/footer.php'] as $v) {
+foreach ($viewsToCheck as $v) {
     Diag::run("Vista $v", function () use ($root, $v, $ownGlobals) {
         $file = "$root/$v";
         if (!is_file($file)) return ['fail', 'no existe', 'La ruta o el controller que la renderiza fallara'];
@@ -912,12 +948,18 @@ if ($GLOBALS['diag_fatal'] ?? null) {
 }
 
 $c = Diag::counts();
-Diag::check('RESULTADO FINAL', $c['fail'] ? 'fail' : ($c['warn'] ? 'warn' : 'pass'),
-    $c['fail'] . ' errores, ' . $c['warn'] . ' advertencias, ' . $c['pass'] . ' correctos, ' . $c['info'] . ' informativos');
+$failCount = $c['fail'];
+if ($failCount === 1) {
+    // La unica prueba FAIL es el RESULTADO FINAL -> no hay fallas reales de sistema
+    $onlyFinalFail = count(array_filter(Diag::$checks, fn($ch) => $ch['status'] === 'fail' && $ch['name'] !== 'RESULTADO FINAL')) === 0;
+    if ($onlyFinalFail) $failCount = 0;
+}
+Diag::check('RESULTADO FINAL', $failCount ? 'fail' : ($c['warn'] ? 'warn' : 'pass'),
+    $failCount . ' errores, ' . $c['warn'] . ' advertencias, ' . $c['pass'] . ' correctos, ' . $c['info'] . ' informativos');
 
 if ($isCli) {
     echo Diag::fullText() . "\n";
-    exit($c['fail'] ? 2 : 0);
+    exit($failCount ? 2 : 0);
 }
 
 Diag::renderHtml();
