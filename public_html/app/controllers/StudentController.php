@@ -44,6 +44,8 @@ class StudentController extends Controller {
 
         $result  = Student::filter($filters);
         $counts  = Student::stateCounts();
+        // Lista de cursos ordenada por nombre, SIEMPRE como arrays asociativos
+        // (la vista accede con $c['id'] / $c['curso']).
         $courses = Course::orderBy('curso');
         $birthdays = method_exists(Student::class, 'birthdaysToday') ? Student::birthdaysToday() : [];
 

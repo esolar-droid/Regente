@@ -12,14 +12,11 @@ class Controller {
      * Render a view
      */
     protected function view($viewPath, $data = []) {
+        // v8: NO se sanea aqui. El codigo anterior aplicaba htmlspecialchars a
+        // las variables extraidas; los ARRAYS pasados a la vista se convertian
+        // en el string "Array", rompiendo sus bucles foreach -> menu vacio y
+        // hoja blanca sin diseno. Cada vista escapa su salida con htmlspecialchars().
         extract($data);
-        
-        // Sanitize data for output
-        foreach ($data as $key => $value) {
-            if (is_string($value)) {
-                $$key = htmlspecialchars($value, ENT_QUOTES, 'UTF-8');
-            }
-        }
         
         $viewFile = APP_ROOT . '/app/views/' . $viewPath . '.php';
         
@@ -121,7 +118,7 @@ class Controller {
      * Get current user
      */
     protected function user() {
-        return user();
+        return user(true);
     }
     
     /**

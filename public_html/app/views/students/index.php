@@ -109,9 +109,11 @@ $murl = function ($changes) use ($filters) {
                     <div class="select is-fullwidth">
                         <select name="curso" onchange="this.form.submit()">
                             <option value="">Todos los cursos</option>
-                            <?php foreach ($courses as $c): ?>
-                                <option value="<?= (int)$c['id'] ?>" <?= $filters['id_curso'] === (int)$c['id'] ? 'selected' : '' ?>>
-                                    <?= $h($c['curso']) ?>
+                            <?php foreach ($courses as $c):
+                                $cid = is_array($c) ? ($c["id"] ?? 0) : ($c->id ?? 0);
+                                $cnm = is_array($c) ? ($c["curso"] ?? "") : ($c->curso ?? ""); ?>
+                                <option value="<?= (int)$cid ?>" <?= $filters["id_curso"] === (int)$cid ? "selected" : "" ?>>
+                                    <?= $h($cnm) ?>
                                 </option>
                             <?php endforeach; ?>
                         </select>

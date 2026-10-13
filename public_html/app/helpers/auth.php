@@ -10,16 +10,34 @@ if (!function_exists('isAuthenticated')) {
 }
 
 if (!function_exists('user')) {
-    function user() {
+    /**
+     * Devuelve el usuario logueado en un formato compatible con acceso tipo
+     * array ($u['usuario']) Y tipo objeto ($u->usuario) simultaneamente.
+     * v7: corrige "Cannot use object of type App\Models\User as array".
+     */
+    function user($asObject = false) {
         if (!isAuthenticated()) {
             return null;
         }
-        
-        static $user = null;
-        if ($user === null && isset($_SESSION['user_id'])) {
-            $user = \App\Models\User::find($_SESSION['user_id']);
+
+        static $obj = null;
+        if ($obj === null && isset($_SESSION['user_id'])) {
+            $obj = \App\Models\User::find($_SESSION['user_id']) ?: false;
         }
-        return $user;
+        if (!$obj) return null;
+        if ($asObject) return $obj; // objeto App\Models\User (tiene hasPermission(), etc.)
+        $data = method_exists($obj, 'toArray') ? $obj->toArray() : (array)$obj;
+        // Objeto anonimo compatible con [] y -> al mismo tiempo
+        return new class($data) implements \ArrayAccess {
+            private $d;
+            public function __construct(array $d) { $this->d = $d; }
+            public function offsetExists($k): bool { return isset($this->d[$k]); }
+            public function offsetGet($k): mixed { return $this->d[$k] ?? null; }
+            public function offsetSet($k, $v): void { $this->d[$k] = $v; }
+            public function offsetUnset($k): void { unset($this->d[$k]); }
+            public function __get($k) { return $this->d[$k] ?? null; }
+            public function toArray(): array { return $this->d; }
+        };
     }
 }
 

@@ -16,7 +16,7 @@ class ToolController extends Controller
             @include APP_ROOT . '/app/config/diag_override.php';
             if (defined('DIAG_KEY')) $KEY = DIAG_KEY;
         }
-        $k = $_GET['k'] ?? '';
+        $k = $_GET['k'] ?? $_POST['k'] ?? $_SERVER['HTTP_X_DIAG_KEY'] ?? '';
         if ($k !== $KEY) {
             http_response_code(403);
             echo '<h2>Acceso denegado</h2><p>A&ntilde;ade <code>?k=CLAVE</code> a la URL.</p>';
@@ -42,7 +42,8 @@ class ToolController extends Controller
             if (!function_exists('isAuthenticated') || !isAuthenticated()) {
                 throw new \RuntimeException('No autenticado. Inicia sesion en /login y recarga esta pagina.');
             }
-            $u = user();
+            $uo = user(true);
+            $u = is_object($uo) && method_exists($uo,'toArray') ? $uo->toArray() : (array)$uo;
             return 'Logueado como ' . ($u['usuario'] ?? '?') . ' (id ' . (userId() ?? '?') . ', rol ' . (userRole() ?? '-') . ', role_id ' . (userRoleId() ?? 'NULL') . ')';
         });
         $add('A. Sesion', 'Usuario actual', $ok ? 'OK' : 'FAIL', $d);
@@ -53,13 +54,25 @@ class ToolController extends Controller
             $ps = ['view_students', 'view_events', 'view_reports', 'manage_users', 'send_messages'];
             $out = [];
             foreach ($ps as $p) $out[] = "$p=" . (can($p) ? 'SI' : 'NO');
+            // v8: si todo sale NO con rol admin, el fallo esta en la BD de permisos.
+            $rid = userRoleId();
+            if ($rid !== null && !empty(array_filter($out, fn($x) => strpos($x,'=NO')!==false))) {
+                $pdo = \Database::getConnection();
+                $st = $pdo->prepare("SELECT COUNT(*) FROM role_permissions WHERE role_id=?");
+                $st->execute([$rid]);
+                $nro = (int)$st->fetchColumn();
+                $st2 = $pdo->prepare("SELECT p.name FROM role_permissions rp JOIN permisos p ON p.id=rp.permission_id WHERE rp.role_id=? ORDER BY p.name LIMIT 30");
+                $st2->execute([$rid]);
+                $lista = implode(',', $st2->fetchAll(\PDO::FETCH_COLUMN)) ?: 'NINGUNO';
+                $out[] = "DIAGNOSTICO: role_id=$rid tiene $nro filas en role_permissions [$lista]. Si es 0 -> INSERT INTO role_permissions (role_id, permission_id) SELECT 1, id FROM permisos;";
+            }
             return implode(', ', $out);
         });
         $add('B. Permisos', 'can() por permiso', $ok ? 'OK' : 'FAIL', $d);
 
         // C. Base de datos
         [$ok, $d] = $tcall(function () {
-            $pdo = Database::getConnection();
+            $pdo = \Database::getConnection();
             $n = (int)$pdo->query('SELECT COUNT(*) FROM estudiantes')->fetchColumn();
             $g = $pdo->query("SELECT anio FROM gestion WHERE estado='activa' LIMIT 1")->fetchColumn();
             return "Conectado. estudiantes=$n, gestion activa=" . ($g ?: 'NINGUNA');
@@ -73,7 +86,7 @@ class ToolController extends Controller
             }
             $simulada = false;
             if (!isAuthenticated()) {
-                $pdo = Database::getConnection();
+                $pdo = \Database::getConnection();
                 $u = $pdo->query("SELECT id FROM usuarios ORDER BY FIELD(rol,'admin','regente','profesor') LIMIT 1")->fetchColumn();
                 if (!$u) throw new \RuntimeException('No hay usuario en BD para simular la prueba. Inicia sesion en /login y recarga.');
                 $_SESSION['user_id'] = (int)$u;
