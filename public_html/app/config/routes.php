@@ -13,6 +13,9 @@ Router::get('/logout', 'App\Controllers\AuthController@logout');
 // Dashboard
 Router::get('/dashboard', 'App\Controllers\DashboardController@index', ['App\Middleware\AuthMiddleware']);
 
+// API de sugerencias (busqueda predictiva reutilizable: estudiantes, cursos...)
+Router::get('/api/suggest', 'App\Controllers\ApiController@suggest', ['App\Middleware\AuthMiddleware']);
+
 // Users
 Router::get('/users', 'App\Controllers\UserController@index', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
 Router::get('/users/create', 'App\Controllers\UserController@create', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);

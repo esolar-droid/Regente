@@ -84,14 +84,26 @@ $murl = function ($changes) use ($filters) {
             <?php endforeach; ?>
         </div>
 
+        <!-- Filtros rapidos: Cumpleañeros -->
+        <div class="buttons are-small mb-3" style="flex-wrap:wrap;">
+            <a href="<?= $h($murl(['estado' => 'cumpleanos'])) ?>"
+               class="button <?= $filters['estado'] === 'cumpleanos' ? 'is-warning' : 'is-white' ?>"
+               title="Estudiantes que cumplen años hoy (ordenados por curso)">
+                <span class="icon"><i class="fas fa-cake-candles"></i></span>
+                <span>Cumpleañeros</span>
+                <span class="tag <?= $filters['estado'] === 'cumpleanos' ? 'is-white' : 'is-light' ?> ml-1"><?= count($birthdays ?? []) ?></span>
+            </a>
+        </div>
+
         <!-- Buscador + filtro curso -->
         <form method="get" action="/students" class="mb-5">
             <div class="columns is-mobile">
                 <div class="column">
                     <div class="field has-addons">
-                        <div class="control is-expanded">
-                            <input class="input" type="text" name="q" placeholder="Buscar por nombre o código BNB…"
-                                   value="<?= $h($filters['search']) ?>">
+                        <div class="control is-expanded" style="position:relative;">
+                            <input class="input" type="text" name="q" id="studentSearch" placeholder="Buscar por nombre o código BNB…"
+                                   value="<?= $h($filters['search']) ?>" autocomplete="off" data-suggest-url="/api/suggest?type=estudiante">
+                            <div id="studentSuggest" class="suggest-box" hidden></div>
                         </div>
                         <div class="control">
                             <button class="button is-info" type="submit">
@@ -132,8 +144,8 @@ $murl = function ($changes) use ($filters) {
                         <th>Código BNB</th>
                         <th>Curso</th>
                         <th>Estado</th>
-                        <th class="has-text-centered">Eventos<br><small class="has-text-grey">(A/F/L)</small></th>
-                        <th>Acudientes</th>
+                        <th class="has-text-centered">Eventos<br><small style="color:#fff;opacity:.85;">(A/F/L)</small></th>
+                        <th>Tutores</th>
                         <th style="min-width:150px;">Acciones</th>
                     </tr>
                 </thead>
@@ -163,8 +175,8 @@ $murl = function ($changes) use ($filters) {
                             <span class="has-text-info"><?= (int)($evAgg[(int)$s['id']]['licencia'] ?? 0) ?></span>
                         </td>
                         <td class="is-size-7">
-                            <?php if (!empty($s['telefono_papa'])): ?><i class="fas fa-phone fab fa-whatsapp" title="Papá: <?= $h($s['telefono_papa']) ?>"></i> Papa<?php endif; ?>
-                            <?php if (!empty($s['telefono_mama'])): ?> <i class="fas fa-phone" title="Mamá: <?= $h($s['telefono_mama']) ?>"></i> Mamá<?php endif; ?>
+                            <?php if (!empty($s['telefono_papa'])): ?>Papá: <?= $h($s['telefono_papa']) ?><br><?php endif; ?>
+                            <?php if (!empty($s['telefono_mama'])): ?>Mamá: <?= $h($s['telefono_mama']) ?><?php endif; ?>
                             <?php if (empty($s['telefono_papa']) && empty($s['telefono_mama'])): ?>
                                 <span class="has-text-danger">Sin teléfono</span>
                             <?php endif; ?>
@@ -179,12 +191,28 @@ $murl = function ($changes) use ($filters) {
                                         <span class="icon"><i class="fas fa-pen"></i></span>
                                     </a>
                                 <?php endif; ?>
-                                <a class="button is-success is-light" title="WhatsApp papá"
-                                   href="https://wa.me/<?= preg_replace('/\D/', '', (string)($s['telefono_papa'] ?? '')) ?>?text=<?= rawurlencode('Saludos cordiales familia ' . $s['nombre_completo'] . ', le escribe la regencia del Colegio Marista.') ?>"
-                                   target="_blank" rel="noopener"
-                                   <?= empty($s['telefono_papa']) ? 'style="display:none"' : '' ?>>
+                                <?php $waText = 'Saludos cordiales familia ' . $s['nombre_completo'] . ', le escribe la regencia del Colegio Marista.'; ?>
+                                <?php if (!empty($s['telefono_papa'])): ?>
+                                <a class="button is-success is-light" title="WhatsApp Papá"
+                                   href="https://wa.me/<?= preg_replace('/\D/', '', (string)$s['telefono_papa']) ?>?text=<?= rawurlencode($waText) ?>"
+                                   target="_blank" rel="noopener">
                                     <span class="icon"><i class="fab fa-whatsapp"></i></span>
                                 </a>
+                                <?php endif; ?>
+                                <?php if (!empty($s['telefono_mama'])): ?>
+                                <a class="button is-danger is-light" title="WhatsApp Mamá" style="color:#d63384;"
+                                   href="https://wa.me/<?= preg_replace('/\D/', '', (string)$s['telefono_mama']) ?>?text=<?= rawurlencode($waText) ?>"
+                                   target="_blank" rel="noopener">
+                                    <span class="icon"><i class="fab fa-whatsapp"></i></span>
+                                </a>
+                                <?php endif; ?>
+                                <?php if (!empty($s['telefono_estudiante'])): ?>
+                                <a class="button is-link is-light" title="WhatsApp Estudiante"
+                                   href="https://wa.me/<?= preg_replace('/\D/', '', (string)$s['telefono_estudiante']) ?>?text=<?= rawurlencode('Estimado(a) ' . $s['nombre_completo'] . ', le escribe la regencia del Colegio Marista.') ?>"
+                                   target="_blank" rel="noopener">
+                                    <span class="icon"><i class="fab fa-whatsapp"></i></span>
+                                </a>
+                                <?php endif; ?>
                             </div>
                         </td>
                     </tr>
