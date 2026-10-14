@@ -16,7 +16,7 @@ if (isAuthenticated()) {
         'title' => 'General',
         'items' => array_values(array_filter([
             ['route' => '/dashboard', 'label' => 'Inicio', 'icon' => 'fas fa-home'],
-            can('view_events') ? ['route' => '/attendance', 'label' => 'Asistencia', 'icon' => 'fas fa-clipboard-check', 'badge' => 'pronto'] : null,
+            can('view_events') ? ['route' => '/events?tab=masiva', 'label' => 'Registro de Eventos', 'icon' => 'fas fa-calendar-check'] : null,
             can('view_reports') ? ['route' => '/reports', 'label' => 'Reportes', 'icon' => 'fas fa-chart-bar'] : null,
         ])),
     ];
@@ -36,7 +36,7 @@ if (isAuthenticated()) {
         $sections[] = [
             'title' => 'Comunicación',
             'items' => array_values(array_filter([
-                can('view_messages') ? ['route' => '/messages', 'label' => 'Mensajes WhatsApp', 'icon' => 'fab fa-whatsapp'] : null,
+                can('view_messages') ? ['route' => '/messages', 'label' => 'Hoja de Mensajería', 'icon' => 'fab fa-whatsapp'] : null,
                 can('send_whatsapp') ? ['route' => '/templates', 'label' => 'Plantillas', 'icon' => 'fas fa-file-alt', 'badge' => 'pronto'] : null,
             ])),
         ];
