@@ -174,15 +174,23 @@ class Student extends Model {
         $params  = [];
 
         if (!empty($f['search'])) {
-            $where[]  = "(e.nombre_completo LIKE ? OR e.codigo_bnb LIKE ?)";
-            $s        = '%' . $f['search'] . '%';
-            $params[] = $s; $params[] = $s;
+            // Busqueda por PALABRAS: cada termino se busca en nombre O codigo,
+            // en cualquier orden ("maria lopez" encuentra "Lopez de Maria, Ana")
+            $words = preg_split('/\s+/', trim($f['search']), -1, PREG_SPLIT_NO_EMPTY);
+            foreach (array_slice($words, 0, 6) as $w) {
+                $where[]  = "(e.nombre_completo LIKE ? OR e.codigo_bnb LIKE ?)";
+                $s        = '%' . $w . '%';
+                $params[] = $s; $params[] = $s;
+            }
         }
         if (!empty($f['estado']) && in_array($f['estado'], self::STATES, true)) {
             $where[]  = "e.estado = ?";
             $params[] = $f['estado'];
         } elseif (($f['estado'] ?? '') === 'activos') {
             $where[] = "e.estado <> 'retirado'";
+        } elseif (($f['estado'] ?? '') === 'cumpleanos') {
+            // Filtro Cumpleañeros: nacidos hoy, ordenados por curso
+            $where[] = "e.fecha_nacimiento IS NOT NULL AND DATE_FORMAT(e.fecha_nacimiento, '%m-%d') = DATE_FORMAT(CURDATE(), '%m-%d')";
         }
         if (!empty($f['id_curso'])) {
             $where[]  = "e.id_curso = ?";
@@ -198,11 +206,14 @@ class Student extends Model {
             $stmt->execute($params);
             $total = (int)$stmt->fetchColumn();
 
+            $order = (($f['estado'] ?? '') === 'cumpleanos')
+                ? 'ORDER BY c.curso ASC, e.nombre_completo ASC'   // cumpleañeros: agrupados por curso
+                : 'ORDER BY e.nombre_completo ASC';
             $sql = "SELECT e.*, c.curso AS curso_nombre, c.paralelo AS curso_paralelo
                     FROM estudiantes e
                     LEFT JOIN cursos c ON e.id_curso = c.id
                     $sqlWhere
-                    ORDER BY e.nombre_completo ASC
+                    $order
                     LIMIT $perPage OFFSET " . (($page - 1) * $perPage);
             $stmt = $db->prepare($sql);
             $stmt->execute($params);

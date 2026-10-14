@@ -10,15 +10,27 @@ namespace App\Models;
 use PDO;
 use PDOException;
 
-abstract class Model {
+abstract class Model implements \ArrayAccess {
     protected static $table = '';
     protected static $primaryKey = 'id';
     protected $data = [];
     
     public function __construct($data = []) {
         $this->data = $data;
+        // v9: PROPAGAR los datos a las propiedades declaradas en los modelos.
+        // Student/Course/Management declaran `public $nombre_completo;` etc.;
+        // al existir la propiedad publica, PHP NUNCA llama a __get() y devolvia
+        // null -> por eso la Ficha (show) y el formulario de Edicion salian en
+        // BLANCO. Ahora ambos caminos ($obj->campo y $obj['campo']) leen de la
+        // misma fuente ($this->data). Esto se aplica automaticamente a TODOS
+        // los modelos futuros (Event, Message, User...): causa raiz global.
+        foreach ((array)$data as $k => $v) {
+            if ($k !== '' && property_exists($this, $k)) {
+                try { $this->$k = $v; } catch (\Throwable $e) { /* solo-lectura */ }
+            }
+        }
     }
-    
+
     public function __get($name) {
         return $this->data[$name] ?? null;
     }
@@ -34,6 +46,20 @@ abstract class Model {
     public function toArray() {
         return $this->data;
     }
+
+    // ---- v9: acceso tipo array ($obj['campo']) sobre los modelos, para que
+    // las vistas puedan usar objeto o array indistintamente sin romper nada.
+    #[\ReturnTypeWillChange]
+    public function offsetExists($k): bool { return isset($this->data[$k]); }
+    #[\ReturnTypeWillChange]
+    public function offsetGet($k)          { return $this->data[$k] ?? null; }
+    #[\ReturnTypeWillChange]
+    public function offsetSet($k, $v): void {
+        $this->data[$k] = $v;
+        if ($k !== '' && property_exists($this, (string)$k)) $this->$k = $v;
+    }
+    #[\ReturnTypeWillChange]
+    public function offsetUnset($k): void  { unset($this->data[$k]); }
     
     public static function getTableName() {
         return static::$table;

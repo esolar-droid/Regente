@@ -42,7 +42,7 @@ class StudentController extends Controller {
             'page'     => (int)($q['page'] ?? 1),
         ];
 
-        $result  = Student::filter($filters);
+        $result  = Student::filter($filters + ['per_page' => 45]);
         $counts  = Student::stateCounts();
         // Lista de cursos ordenada por nombre, SIEMPRE como arrays asociativos
         // (la vista accede con $c['id'] / $c['curso']).
