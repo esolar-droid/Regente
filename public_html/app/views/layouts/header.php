@@ -37,8 +37,8 @@
                     <?php endif; ?>
                     
                     <?php if (can('view_courses')): ?>
-                        <a class="navbar-item has-text-white" href="/courses">
-                            <i class="fas fa-chalkboard"></i>&nbsp; Cursos
+                        <a class="navbar-item has-text-white" href="/search">
+                            <i class="fas fa-search"></i>&nbsp; Buscar
                         </a>
                     <?php endif; ?>
                     

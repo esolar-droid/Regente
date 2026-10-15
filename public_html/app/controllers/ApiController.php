@@ -36,7 +36,23 @@ class ApiController extends Controller {
             $db  = \Database::getConnection();
             $out = [];
 
-            if ($type === 'curso') {
+            if ($type === 'profesor') {
+                // Sugerencias para la página «Buscar» (y futuras): usuarios con rol profesor.
+                $st = $db->prepare(
+                    "SELECT id, nombre, apellido FROM usuarios
+                     WHERE rol IN ('profesor','docente') AND (nombre LIKE ? OR apellido LIKE ?)
+                     ORDER BY nombre, apellido LIMIT 10"
+                );
+                $like = '%' . $q . '%';
+                $st->execute([$like, $like]);
+                foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                    $out[] = [
+                        'label' => trim($r['nombre'] . ' ' . $r['apellido']),
+                        'sub'   => '',
+                        'url'   => '/search?tipo=profesor&profesor_id=' . (int)$r['id'],
+                    ];
+                }
+            } elseif ($type === 'curso') {
                 $st = $db->prepare(
                     "SELECT id, curso FROM cursos
                      WHERE curso LIKE ? OR grado LIKE ? OR paralelo LIKE ?

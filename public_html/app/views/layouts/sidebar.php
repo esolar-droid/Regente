@@ -16,7 +16,7 @@ if (isAuthenticated()) {
         'title' => 'General',
         'items' => array_values(array_filter([
             ['route' => '/dashboard', 'label' => 'Inicio', 'icon' => 'fas fa-home'],
-            can('view_events') ? ['route' => '/attendance', 'label' => 'Asistencia', 'icon' => 'fas fa-clipboard-check', 'badge' => 'pronto'] : null,
+            can('view_events') ? ['route' => '/events?tab=masiva', 'label' => 'Registro de Eventos', 'icon' => 'fas fa-calendar-check'] : null,
             can('view_reports') ? ['route' => '/reports', 'label' => 'Reportes', 'icon' => 'fas fa-chart-bar'] : null,
         ])),
     ];
@@ -26,7 +26,9 @@ if (isAuthenticated()) {
             'title' => 'Académico',
             'items' => array_values(array_filter([
                 can('view_students') ? ['route' => '/students', 'label' => 'Estudiantes', 'icon' => 'fas fa-user-graduate'] : null,
-                can('view_courses') ? ['route' => '/courses', 'label' => 'Cursos y Horarios', 'icon' => 'fas fa-chalkboard'] : null,
+                // «Cursos y Horarios» se renombró a «Buscar»: 3 columnas de
+                // consulta en tiempo real sobre la tabla horarios.
+                can('view_courses') ? ['route' => '/search', 'label' => 'Buscar', 'icon' => 'fas fa-search'] : null,
                 can('view_events') ? ['route' => '/events', 'label' => 'Eventos', 'icon' => 'fas fa-calendar-alt'] : null,
             ])),
         ];
@@ -36,7 +38,7 @@ if (isAuthenticated()) {
         $sections[] = [
             'title' => 'Comunicación',
             'items' => array_values(array_filter([
-                can('view_messages') ? ['route' => '/messages', 'label' => 'Mensajes WhatsApp', 'icon' => 'fab fa-whatsapp'] : null,
+                can('view_messages') ? ['route' => '/messages', 'label' => 'Hoja de Mensajería', 'icon' => 'fab fa-whatsapp'] : null,
                 can('send_whatsapp') ? ['route' => '/templates', 'label' => 'Plantillas', 'icon' => 'fas fa-file-alt', 'badge' => 'pronto'] : null,
             ])),
         ];

@@ -43,6 +43,11 @@ Router::get('/courses/{id}/edit', 'App\Controllers\CourseController@edit', ['App
 Router::post('/courses/{id}/update', 'App\Controllers\CourseController@update', ['App\Middleware\AuthMiddleware']);
 Router::post('/courses/{id}/delete', 'App\Controllers\CourseController@destroy', ['App\Middleware\AuthMiddleware']);
 
+// Buscar (antes «Cursos y Horarios»): 3 columnas de consulta en tiempo real
+// sobre la tabla `horarios` (profesor / curso / asignatura AHORA).
+Router::get('/search', 'App\Controllers\SearchController@index', ['App\Middleware\AuthMiddleware']);
+Router::get('/buscar', 'App\Controllers\SearchController@index', ['App\Middleware\AuthMiddleware']); // alias amigable
+
 // Events
 Router::get('/events', 'App\Controllers\EventController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/events/create', 'App\Controllers\EventController@create', ['App\Middleware\AuthMiddleware']);
@@ -51,14 +56,19 @@ Router::get('/events/{id}/edit', 'App\Controllers\EventController@edit', ['App\M
 Router::post('/events/{id}/update', 'App\Controllers\EventController@update', ['App\Middleware\AuthMiddleware']);
 Router::post('/events/{id}/delete', 'App\Controllers\EventController@destroy', ['App\Middleware\AuthMiddleware']);
 
+Router::get('/attendance', 'App\Controllers\EventController@attendance', ['App\Middleware\AuthMiddleware']);
+Router::post('/attendance/save', 'App\Controllers\EventController@saveAttendance', ['App\Middleware\AuthMiddleware']);
+
 // Management (School Year)
 Router::get('/management', 'App\Controllers\ManagementController@index', ['App\Middleware\AuthMiddleware']);
 Router::post('/management/switch', 'App\Controllers\ManagementController@switch', ['App\Middleware\AuthMiddleware']);
 
-// Messages
+// Messages — «Hoja de mensajería» (pestañas: enviar | historial)
 Router::get('/messages', 'App\Controllers\MessageController@index', ['App\Middleware\AuthMiddleware']);
-Router::get('/messages/create', 'App\Controllers\MessageController@create', ['App\Middleware\AuthMiddleware']);
-Router::post('/messages/store', 'App\Controllers\MessageController@store', ['App\Middleware\AuthMiddleware']);
+Router::post('/messages/log', 'App\Controllers\MessageController@logSend', ['App\Middleware\AuthMiddleware']);
+Router::post('/messages/{id}/delete', 'App\Controllers\MessageController@destroy', ['App\Middleware\AuthMiddleware']);
+// Compatibilidad con enlaces viejos -> pestaña de envío
+Router::get('/messages/create', 'App\Controllers\MessageController@index', ['App\Middleware\AuthMiddleware']);
 
 // Reports
 Router::get('/reports', 'App\Controllers\ReportController@index', ['App\Middleware\AuthMiddleware']);

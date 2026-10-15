@@ -138,4 +138,172 @@ class Event extends Model {
             return ['atraso' => 0, 'licencia' => 0, 'falta' => 0, 'total' => 0];
         }
     }
+
+    // ====================================================================
+    // v11 — ASISTENCIA: helpers de grilla masiva y alta individual
+    // ====================================================================
+
+    /** Mapa tipo_evento corto ('A','L','F') => valor ENUM físico. */
+    public static function shortToType($short) {
+        switch (strtoupper((string)$short)) {
+            case 'A': return 'atraso';
+            case 'L': return 'licencia';
+            case 'F': return 'falta';
+            default:  return null;
+        }
+    }
+
+    /** Valor ENUM físico => letra corta para la grilla. */
+    public static function typeToShort($tipo) {
+        switch (strtolower((string)$tipo)) {
+            case 'atraso':   return 'A';
+            case 'licencia': return 'L';
+            case 'ausencia':
+            case 'falta':    return 'F';
+            default:         return '';
+        }
+    }
+
+    /** Letra corta => nombre legible ('Atraso'|'Licencia'|'Falta'). */
+    public static function shortToTypeLabel($short) {
+        switch (strtoupper((string)$short)) {
+            case 'A': return 'Atraso';
+            case 'L': return 'Licencia';
+            case 'F': return 'Falta';
+            default:  return '';
+        }
+    }
+
+    /**
+     * Eventos de UN día para muchos estudiantes en una sola consulta.
+     * Devuelve [id_estudiante => ['tipo'=>'A|L|F','just'=>string]].
+     */
+    public static function dayMarks(array $studentIds, $date) {
+        $studentIds = array_values(array_filter(array_map('intval', $studentIds)));
+        if (!$studentIds || !$date) return [];
+        try {
+            $db = \Database::getConnection();
+            $ph = implode(',', array_fill(0, count($studentIds), '?'));
+            $stmt = $db->prepare(
+                "SELECT id_estudiante, tipo_evento, justificacion
+                 FROM eventos WHERE fecha_evento = ? AND id_estudiante IN ($ph)"
+            );
+            $stmt->execute(array_merge([$date], $studentIds));
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $out[(int)$r['id_estudiante']] = [
+                    'tipo' => self::typeToShort($r['tipo_evento']),
+                    'just' => (string)($r['justificacion'] ?? ''),
+                ];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            error_log('Event dayMarks(): ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Inserta o actualiza (upsert) el evento de estudiante+fecha.
+     * Si $short es '' / null elimina cualquier evento de ese día (vuelve a P).
+     * Sobrescribe sin rastro (decisión del proyecto: auditoría = sobreescribir).
+     */
+    public static function upsertDay($studentId, $date, $short, $just = '', $userId = null) {
+        $studentId = (int)$studentId;
+        if (!$studentId || !preg_match('/^\d{4}-\d{2}-\d{2}$/', (string)$date)) return false;
+
+        try {
+            $db = \Database::getConnection();
+
+            if (!self::shortToType($short)) {
+                $stmt = $db->prepare("DELETE FROM eventos WHERE id_estudiante = ? AND fecha_evento = ?");
+                $stmt->execute([$studentId, $date]);
+                return true;
+            }
+
+            $stmt = $db->prepare("SELECT id FROM eventos WHERE id_estudiante = ? AND fecha_evento = ? LIMIT 1");
+            $stmt->execute([$studentId, $date]);
+            $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+            if ($row) {
+                $u = $db->prepare("UPDATE eventos SET tipo_evento = ?, justificacion = ?, id_usuario_registro = ?, fecha_registro = NOW() WHERE id = ?");
+                return $u->execute([self::shortToType($short), $just ?: null, $userId, $row['id']]);
+            }
+            $i = $db->prepare("INSERT INTO eventos (id_estudiante, tipo_evento, fecha_evento, justificacion, id_usuario_registro, fecha_registro) VALUES (?,?,?,?,?,NOW())");
+            return $i->execute([$studentId, self::shortToType($short), $date, $just ?: null, $userId]);
+        } catch (\Throwable $e) {
+            error_log('Event upsertDay(): ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Alta individual con RANGO de fechas: pinta la letra elegida en cada día
+     * hábil del rango. Con $preview=true NO escribe: devuelve cuántos días ya
+     * tienen registro (para el aviso de confirmación de sobrescritura).
+     */
+    public static function applyRange($studentId, $start, $end, $short, $just = '', $userId = null, $preview = false) {
+        $studentId = (int)$studentId;
+        if (!$studentId || !strtotime((string)$start) || !strtotime((string)$end)) {
+            return ['ok' => false, 'error' => 'Fechas inválidas', 'total' => 0, 'conflictos' => []];
+        }
+        if (!self::shortToType($short)) {
+            return ['ok' => false, 'error' => 'Tipo inválido', 'total' => 0, 'conflictos' => []];
+        }
+        $s = date('Y-m-d', strtotime($start));
+        $e = date('Y-m-d', strtotime($end));
+        if ($s > $e) { [$s, $e] = [$e, $s]; }
+
+        $feriados = Feriado::mapForDates(self::datesBetween($s, $e));
+        $conflictos = [];
+        $total = 0;
+        try {
+            $db = \Database::getConnection();
+            $chk = $db->prepare("SELECT COUNT(*) FROM eventos WHERE id_estudiante = ? AND fecha_evento BETWEEN ? AND ?");
+            $chk->execute([$studentId, $s, $e]);
+            $conflictos = [['desde' => $s, 'hasta' => $e, 'n' => (int)$chk->fetchColumn()]];
+        } catch (\Throwable $ex) {
+            error_log('Event applyRange check(): ' . $ex->getMessage());
+        }
+
+        if ($preview) {
+            return ['ok' => true, 'preview' => true, 'total' => $total, 'conflictos' => $conflictos, 'error' => null];
+        }
+
+        foreach (self::datesBetween($s, $e) as $d) {
+            if (isset($feriados[$d])) continue;   // feriado: se salta
+            if (self::upsertDay($studentId, $d, $short, $just, $userId)) $total++;
+        }
+        return ['ok' => true, 'total' => $total, 'conflictos' => [], 'error' => null];
+    }
+
+    /** Lista de fechas ISO entre dos fechas (inclusive), máx 370 días. */
+    public static function datesBetween($from, $to) {
+        $out = [];
+        $ts = strtotime($from); $te = strtotime($to);
+        if ($ts === false || $te === false || $te < $ts) return $out;
+        for ($i = 0; $i <= 370 && $ts + $i * 86400 <= $te; $i++) {
+            $out[] = date('Y-m-d', $ts + $i * 86400);
+        }
+        return $out;
+    }
+
+    /** Estudiantes activos de un curso en la gestión activa (nómina). */
+    public static function rosterByCourse($courseId) {
+        try {
+            $db = \Database::getConnection();
+            $stmt = $db->prepare(
+                "SELECT e.id, e.nombre_completo, e.codigo_bnb
+                 FROM estudiantes e
+                 JOIN gestion g ON g.anio = YEAR(CURDATE()) AND g.estado = 'activa'
+                 WHERE e.id_curso = ? AND e.id_gestion = g.id AND e.estado <> 'retirado'
+                 ORDER BY e.nombre_completo"
+            );
+            $stmt->execute([(int)$courseId]);
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('Event rosterByCourse(): ' . $e->getMessage());
+            return [];
+        }
+    }
 }
