@@ -48,6 +48,8 @@ if (isAuthenticated()) {
         $sections[] = [
             'title' => 'Administración',
             'items' => array_values(array_filter([
+                // Página central de administración (4 pestañas): solo administrador.
+                isAdmin() ? ['route' => '/admin', 'label' => 'Administración', 'icon' => 'fas fa-shield-alt'] : null,
                 can('view_users') ? ['route' => '/users', 'label' => 'Usuarios', 'icon' => 'fas fa-users-cog'] : null,
                 can('view_management') ? ['route' => '/management', 'label' => 'Gestión Escolar', 'icon' => 'fas fa-calendar-check'] : null,
                 can('view_professors') ? ['route' => '/professors', 'label' => 'Profesores', 'icon' => 'fas fa-user-tie', 'badge' => 'pronto'] : null,

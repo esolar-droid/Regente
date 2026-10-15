@@ -48,6 +48,29 @@ Router::post('/courses/{id}/delete', 'App\Controllers\CourseController@destroy',
 Router::get('/search', 'App\Controllers\SearchController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/buscar', 'App\Controllers\SearchController@index', ['App\Middleware\AuthMiddleware']); // alias amigable
 
+// Administración (4 pestañas) — SOLO administrador. El candado fuerte está
+// dentro de AdminController (requireAdmin()); AuthMiddleware es la primera capa.
+$adminMw = ['App\Middleware\AuthMiddleware'];
+Router::get('/admin', 'App\Controllers\AdminController@index', $adminMw);
+// Pestaña 1: usuarios y permisos
+Router::post('/admin/users/store', 'App\Controllers\AdminController@storeUser', $adminMw);
+Router::post('/admin/users/role', 'App\Controllers\AdminController@updateUserRole', $adminMw);
+Router::post('/admin/permissions/save', 'App\Controllers\AdminController@savePermissions', $adminMw);
+Router::post('/admin/roles/create', 'App\Controllers\AdminController@createRole', $adminMw);
+Router::post('/admin/permissions/create', 'App\Controllers\AdminController@createPermission', $adminMw);
+// Pestaña 2: horarios (CSV plano + edición)
+Router::get('/admin/horarios/plantilla.csv', 'App\Controllers\AdminController@downloadTemplate', $adminMw);
+Router::post('/admin/horarios/import', 'App\Controllers\AdminController@importHorarios', $adminMw);
+Router::post('/admin/horarios/update', 'App\Controllers\AdminController@updateHorario', $adminMw);
+Router::post('/admin/horarios/delete', 'App\Controllers\AdminController@deleteHorario', $adminMw);
+// Pestaña 3: gestión escolar (backup / restaurar / migrar)
+Router::post('/admin/gestion/backup', 'App\Controllers\AdminController@backupGestion', $adminMw);
+Router::post('/admin/gestion/restore', 'App\Controllers\AdminController@restoreGestion', $adminMw);
+Router::post('/admin/gestion/migrate', 'App\Controllers\AdminController@migrateGestion', $adminMw);
+Router::get('/admin/gestion/snapshot/download', 'App\Controllers\AdminController@downloadSnapshot', $adminMw);
+Router::post('/admin/gestion/snapshot/delete', 'App\Controllers\AdminController@deleteSnapshot', $adminMw);
+unset($adminMw);
+
 // Events
 Router::get('/events', 'App\Controllers\EventController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/events/create', 'App\Controllers\EventController@create', ['App\Middleware\AuthMiddleware']);
