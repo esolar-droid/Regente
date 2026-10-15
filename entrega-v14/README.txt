@@ -36,3 +36,17 @@ QUÉ CAMBIA:
 
 VERIFICADO: php -l sin errores en todos los archivos.
 ==============================================================
+
+=== ACTUALIZACIÓN v14.1 (corrección Registro de Eventos) ===
+Archivo: registro-eventos/index.php  ->  sube a app/views/events/index.php (reemplaza)
+
+Cambios en la rejilla semanal (pestaña masiva):
+- Los días futuros ya NO muestran "P" de relleno: aparecen en blanco, salvo
+  que exista una marca real registrada (p. ej. rango futuro cargado desde
+  registro individual), en cuyo caso se muestra esa letra.
+- Si un día editable aparece en blanco, el primer clic lo normaliza a "P"
+  y luego continúa el ciclo P→A→L→F→P.
+- Feriados: verificado, la interacción eventos↔feriados YA estaba implementada
+  (columna bloqueada con tag "feriado", aviso y botón Guardar deshabilitado;
+  también validación server-side en POST /attendance/save).
+Sin cambios en BD ni rutas. Basta reemplazar el archivo de vista.

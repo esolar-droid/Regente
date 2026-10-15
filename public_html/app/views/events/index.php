@@ -141,11 +141,16 @@ $fechaEsFeriado = isset($feriados[$date]);
                  $isFeriado = isset($feriados[$d]);
                  $isFuture = $d > $today;
                  $locked = $isFeriado || $isFuture || !$sel;
-                 $val = $mark ?: 'P';                    // presente por defecto
+                 // "P" de relleno solo en el día elegido (y si no es feriado);
+                 // en los demás días se muestra blanco salvo marca real registrada
+                 // (p. ej. un rango futuro cargado desde registro individual).
+                 $val = $mark ?: ($sel && !$isFeriado ? 'P' : '');
               ?>
                 <td class="att-day-cell <?= $sel ? 'att-selected' : '' ?> <?= $locked ? 'att-locked' : '' ?>"
                     data-sid="<?= $sid ?>" data-fecha="<?= $h($d) ?>" data-locked="<?= $locked ? 1 : 0 ?>">
+                  <?php if ($val !== ''): ?>
                   <span class="att-mark att-<?= $h($val) ?>" data-val="<?= $h($val) ?>"><?= $h($val) ?></span>
+                  <?php endif; ?>
                   <input type="hidden" name="marcas[<?= $sid ?>][t]" value="<?= $sel ? $h($val) : '' ?>" data-for-day="<?= $h($d) ?>" <?= ($sel && !$locked) ? '' : 'disabled' ?>>
                 </td>
               <?php endforeach; ?>
@@ -338,7 +343,18 @@ $fechaEsFeriado = isset($feriados[$date]);
     cell.addEventListener('click', function () {
       var span = cell.querySelector('.att-mark');
       var hidden = cell.querySelector('input[type=hidden]');
-      if (!span || !hidden || hidden.disabled) return;
+      if (!hidden || hidden.disabled) return;
+      // Si el día aparece en blanco (p. ej. marca futura registrada
+      // individualmente), el primer clic lo normaliza a "P" editable.
+      if (!span) {
+        span = document.createElement('span');
+        span.className = 'att-mark att-P';
+        span.dataset.val = 'P';
+        span.textContent = 'P';
+        hidden.value = 'P';
+        cell.insertBefore(span, hidden);
+        return;
+      }
       var idx = CYCLE.indexOf(span.dataset.val || 'P');
       var next = CYCLE[(idx + 1) % CYCLE.length];
       span.dataset.val = next;
