@@ -110,7 +110,7 @@ ob_start();
                                 </div>
                                 <div class="column is-4">
                                     <div class="notification is-danger">
-                                        <p><strong>Ausencias:</strong> <?= $stats['total_ausencias'] ?? 0 ?></p>
+                                        <p><strong>Faltas:</strong> <?= $stats['total_faltas'] ?? 0 ?></p>
                                     </div>
                                 </div>
                             </div>
@@ -162,20 +162,25 @@ ob_start();
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($recentEvents as $event): ?>
+                                        <?php foreach ($recentEvents as $event):
+                                            $eGet = function ($k, $d = '') use ($event) {
+                                                if (is_array($event)) return $event[$k] ?? $d;
+                                                if ($event instanceof \App\Models\Model) return $event->toArray()[$k] ?? $d;
+                                                return $event->$k ?? $d;
+                                            }; ?>
                                             <tr>
-                                                <td><?= htmlspecialchars(date('d/m/Y', strtotime($event->fecha_evento))) ?></td>
+                                                <td><?= htmlspecialchars(date('d/m/Y', strtotime((string)$eGet('fecha_evento')))) ?></td>
                                                 <td>
-                                                    <?= htmlspecialchars($event->student_name) ?>
+                                                    <?= htmlspecialchars((string)$eGet('student_name', '—')) ?>
                                                     <br>
-                                                    <small class="has-text-grey">Código: <?= htmlspecialchars($event->student_code) ?></small>
+                                                    <small class="has-text-grey">Código: <?= htmlspecialchars((string)$eGet('student_code', '—')) ?></small>
                                                 </td>
                                                 <td>
-                                                    <span class="tag is-<?= event_tag_class($event->tipo_evento) ?>">
-                                                        <?= htmlspecialchars(event_label($event->tipo_evento)) ?>
+                                                    <span class="tag is-<?= event_tag_class((string)$eGet('tipo_evento')) ?>">
+                                                        <?= htmlspecialchars(event_label((string)$eGet('tipo_evento'))) ?>
                                                     </span>
                                                 </td>
-                                                <td><?= htmlspecialchars($event->justificacion ?? '-') ?></td>
+                                                <td><?= htmlspecialchars((string)$eGet('justificacion', '-')) ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
@@ -209,20 +214,26 @@ ob_start();
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        <?php foreach ($recentMessages as $message): ?>
+                                        <?php foreach ($recentMessages as $message):
+                                            // Message es objeto (Model); si llegara un array crudo, tambien funciona
+                                            $mGet = function ($k, $d = '') use ($message) {
+                                                if (is_array($message)) return $message[$k] ?? $d;
+                                                if ($message instanceof \App\Models\Model) return $message->toArray()[$k] ?? $d;
+                                                return $message->$k ?? $d;
+                                            }; ?>
                                             <tr>
-                                                <td><?= htmlspecialchars(date('d/m/Y H:i', strtotime($message->fecha_envio))) ?></td>
+                                                <td><?= htmlspecialchars(date('d/m/Y H:i', strtotime((string)$mGet('fecha_envio')))) ?></td>
                                                 <td>
-                                                    <?= htmlspecialchars($message->student_name) ?>
+                                                    <?= htmlspecialchars((string)$mGet('student_name', '—')) ?>
                                                     <br>
-                                                    <small class="has-text-grey">Código: <?= htmlspecialchars($message->student_code) ?></small>
+                                                    <small class="has-text-grey">Código: <?= htmlspecialchars((string)$mGet('student_code', '—')) ?></small>
                                                 </td>
                                                 <td>
-                                                    <span class="tag is-<?= $message->destinatario === 'papa' ? 'primary' : 'info' ?>">
-                                                        <?= htmlspecialchars(ucfirst($message->destinatario)) ?>
+                                                    <span class="tag is-<?= $mGet('destinatario') === 'papa' ? 'primary' : 'info' ?>">
+                                                        <?= htmlspecialchars(ucfirst((string)$mGet('destinatario'))) ?>
                                                     </span>
                                                 </td>
-                                                <td><?= htmlspecialchars($message->sender_name . ' ' . $message->sender_lastname) ?></td>
+                                                <td><?= htmlspecialchars(trim($mGet('sender_name') . ' ' . $mGet('sender_lastname'))) ?></td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>

@@ -1,13 +1,15 @@
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    
+
+    # Herramientas de diagnostico propias: se sirven DIRECTAMENTE, sin pasar por index.php
+    # (evita que el router redirija a /dashboard y que las reglas anti-inyeccion del query string las bloqueen)
+    RewriteCond %{REQUEST_URI} ^/(diagnostico|test-students)\.php$ [NC]
+    RewriteRule ^ - [L]
+
     # Redirect all requests to index.php (except existing files)
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
     RewriteRule ^(.*)$ index.php [QSA,L]
-    
-    # Allow access to diagnostico.php
-    RewriteCond %{REQUEST_URI} !^/diagnostico\.php$
 </IfModule>
 
 <IfModule mod_headers.c>

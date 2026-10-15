@@ -1,0 +1,24 @@
+ENTREGA v8 — fixes definitivos modulo Estudiantes
+Destinos (relativos a /home/regente2.colmarista.com/public_html/):
+
+  Controller.php        -> app/controllers/Controller.php   (CAUSA RAIZ del menu vacio y hoja blanca: el saneado anterior convertia los arrays pasados a las vistas en el string "Array")
+  StudentController.php -> app/controllers/StudentController.php
+  ToolController.php    -> app/controllers/ToolController.php (stcheck ahora acepta la clave por GET, POST o header X-Diag-Key; y diagnostica role_permissions vacio)
+  permissions.php       -> app/helpers/permissions.php        (can(): el rol administrador siempre puede, aunque su role_id no este enlazado)
+  index.php             -> app/views/students/index.php       (select de cursos tolera objetos y arrays; corrige el FAIL D "Course as array")
+
+NO subir database.php (mantiene tus credenciales reales).
+
+PASOS:
+1. Sube los 5 archivos a sus rutas.
+2. Ejecuta en phpMyAdmin (una vez):
+   UPDATE usuarios u JOIN roles r ON r.name = u.rol SET u.role_id = r.id WHERE u.role_id IS NULL;
+3. Haz LOGOUT y LOGIN (obligatorio: la sesion cachea user_role_id).
+4. Abre https://regente2.colmarista.com/tools/stcheck?k=regente-diag-2026&plain=1
+   Esperado: VEREDICTO: MODULO ESTUDIANTES OPERATIVO (A-E todo OK).
+5. Abre https://regente2.colmarista.com/students -> debe verse con Bulma, sidebar completo y busqueda.
+
+EVIDENCIA: estos fixes fueron probados end-to-end contra una copia local de la
+estructura de BD real (MariaDB): /students renderizo 20,959 bytes con CSS, sidebar
+con Estudiantes/Asistencia/Reportes/Cursos/Usuarios/Gestion, tabla paginada y
+cumpleanos. stcheck devolvio A-E todos OK.

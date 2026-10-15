@@ -136,7 +136,7 @@ class AuthController extends Controller {
      * Logout
      */
     public function logout() {
-        $user = user();
+        $user = user(true);
         if ($user) {
             $this->logAction($user, 'Cierre de sesión');
         }
