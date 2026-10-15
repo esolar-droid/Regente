@@ -16,13 +16,14 @@ Router::get('/dashboard', 'App\Controllers\DashboardController@index', ['App\Mid
 // API de sugerencias (busqueda predictiva reutilizable: estudiantes, cursos...)
 Router::get('/api/suggest', 'App\Controllers\ApiController@suggest', ['App\Middleware\AuthMiddleware']);
 
-// Users
-Router::get('/users', 'App\Controllers\UserController@index', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
-Router::get('/users/create', 'App\Controllers\UserController@create', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
-Router::post('/users/store', 'App\Controllers\UserController@store', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
-Router::get('/users/{id}/edit', 'App\Controllers\UserController@edit', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
-Router::post('/users/{id}/update', 'App\Controllers\UserController@update', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
-Router::post('/users/{id}/delete', 'App\Controllers\UserController@destroy', ['App\Middleware\AuthMiddleware', 'App\Middleware\PermissionMiddleware']);
+// Users — la gestión de usuarios vive ahora en Administración (pestaña 1).
+// Estas rutas se conservan por compatibilidad con enlaces viejos y redirigen.
+Router::get('/users', function () { header('Location: /admin?tab=usuarios'); });
+Router::get('/users/create', function () { header('Location: /admin?tab=usuarios'); });
+Router::post('/users/store', function () { header('Location: /admin?tab=usuarios'); exit; });
+Router::get('/users/{id}/edit', function ($id) { header('Location: /admin?tab=usuarios'); });
+Router::post('/users/{id}/update', function ($id) { header('Location: /admin?tab=usuarios'); exit; });
+Router::post('/users/{id}/delete', function ($id) { header('Location: /admin?tab=usuarios'); exit; });
 
 // Students
 Router::get('/tools/stcheck', 'App\Controllers\ToolController@stcheck');
@@ -63,6 +64,11 @@ Router::get('/admin/horarios/plantilla.csv', 'App\Controllers\AdminController@do
 Router::post('/admin/horarios/import', 'App\Controllers\AdminController@importHorarios', $adminMw);
 Router::post('/admin/horarios/update', 'App\Controllers\AdminController@updateHorario', $adminMw);
 Router::post('/admin/horarios/delete', 'App\Controllers\AdminController@deleteHorario', $adminMw);
+// Pestaña 2b: feriados (CSV plano fecha,nombre,anio + edición/borrado)
+Router::get('/admin/feriados/plantilla.csv', 'App\Controllers\AdminController@downloadFeriadosTemplate', $adminMw);
+Router::post('/admin/feriados/import', 'App\Controllers\AdminController@importFeriados', $adminMw);
+Router::post('/admin/feriados/update', 'App\Controllers\AdminController@updateFeriado', $adminMw);
+Router::post('/admin/feriados/delete', 'App\Controllers\AdminController@deleteFeriado', $adminMw);
 // Pestaña 3: gestión escolar (backup / restaurar / migrar)
 Router::post('/admin/gestion/backup', 'App\Controllers\AdminController@backupGestion', $adminMw);
 Router::post('/admin/gestion/restore', 'App\Controllers\AdminController@restoreGestion', $adminMw);
@@ -82,9 +88,9 @@ Router::post('/events/{id}/delete', 'App\Controllers\EventController@destroy', [
 Router::get('/attendance', 'App\Controllers\EventController@attendance', ['App\Middleware\AuthMiddleware']);
 Router::post('/attendance/save', 'App\Controllers\EventController@saveAttendance', ['App\Middleware\AuthMiddleware']);
 
-// Management (School Year)
-Router::get('/management', 'App\Controllers\ManagementController@index', ['App\Middleware\AuthMiddleware']);
-Router::post('/management/switch', 'App\Controllers\ManagementController@switch', ['App\Middleware\AuthMiddleware']);
+// Management (gestión escolar) -> pestaña 3 de Administración
+Router::get('/management', function () { header('Location: /admin?tab=gestion'); });
+Router::post('/management/switch', function () { header('Location: /admin?tab=gestion'); exit; });
 
 // Messages — «Hoja de mensajería» (pestañas: enviar | historial)
 Router::get('/messages', 'App\Controllers\MessageController@index', ['App\Middleware\AuthMiddleware']);

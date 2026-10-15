@@ -77,7 +77,7 @@ class AdminController extends Controller {
 
         $q = $this->getQueryData();
         $tab = $q['tab'] ?? 'usuarios';
-        if (!in_array($tab, ['usuarios', 'horarios', 'gestion', 'diagnostico'])) $tab = 'usuarios';
+        if (!in_array($tab, ['usuarios', 'horarios', 'feriados', 'gestion', 'diagnostico'])) $tab = 'usuarios';
 
         $data = ['csrf_token' => CsrfMiddleware::generateToken(), 'tab' => $tab];
 
@@ -121,6 +121,15 @@ class AdminController extends Controller {
             // Para el modal de edición
             $editId = (int)($q['editar'] ?? 0);
             $data['editRow'] = $editId ? Horario::find($editId) : null;
+        }
+
+        if ($tab === 'feriados') {
+            $year = (int)($q['anio'] ?? date('Y'));
+            if ($year < 2000 || $year > 2100) $year = (int)date('Y');
+            $data['anioSel'] = $year;
+            $data['feriados'] = Feriado::allForAdmin($year);
+            $editId = (int)($q['editar'] ?? 0);
+            $data['editFeriado'] = $editId ? Feriado::find($editId) : null;
         }
 
         if ($tab === 'gestion') {
@@ -589,6 +598,113 @@ class AdminController extends Controller {
             $this->flash('is-danger', 'Error durante la migración (se revirtió todo): ' . $e->getMessage());
         }
         $this->redirect($back);
+    }
+
+    // ============================================================
+    // PESTAÑA 2b — Feriados (CSV plano: fecha,nombre,anio)
+    // ============================================================
+    private function feriadoCsvTemplate() {
+        return "fecha,nombre,anio\n"
+             . "2027-01-01,Año Nuevo,2027\n"
+             . "2027-05-01,Día del Trabajo,2027\n"
+             . "2027-08-06,San Lorenzo (Fundación),2027\n";
+    }
+
+    public function downloadFeriadosTemplate() {
+        $this->requireAuth(); $this->requireAdmin();
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="plantilla-feriados.csv"');
+        echo "\xEF\xBB\xBF" . $this->feriadoCsvTemplate();
+        exit;
+    }
+
+    /** Normaliza fechas admitidas: YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY. */
+    private function normalizeDate($raw) {
+        $raw = trim((string)$raw);
+        if (preg_match('/^(\d{4})-(\d{1,2})-(\d{1,2})$/', $raw, $m)) {
+            $out = sprintf('%04d-%02d-%02d', $m[1], $m[2], $m[3]);
+        } elseif (preg_match('/^(\d{1,2})[\/](\d{1,2})[\/](\d{4})$/', $raw, $m)) {
+            $out = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        } elseif (preg_match('/^(\d{1,2})[-](\d{1,2})[-](\d{4})$/', $raw, $m)) {
+            $out = sprintf('%04d-%02d-%02d', $m[3], $m[2], $m[1]);
+        } else {
+            return null;
+        }
+        $ts = strtotime($out);
+        if (!$ts || date('Y-m-d', $ts) !== $out) return null;
+        return $out;
+    }
+
+    public function importFeriados() {
+        $this->requireAuth(); $this->requireAdmin();
+        $p = $this->getPostData();
+        $back = '/admin?tab=feriados';
+        $text = $p['csv_text'] ?? '';
+        if (trim($text) === '') { $this->flash('is-warning', 'Pega el contenido del CSV de feriados primero.'); $this->redirect($back); }
+
+        $lines = preg_split('/\r\n|\r|\n/', $text);
+        $errors = []; $warns = []; $added = 0; $skipped = 0; $lineNo = 0;
+        foreach ($lines as $line) {
+            $lineNo++;
+            $line = trim($line);
+            if ($line === '' || $line[0] === '#') continue;
+            if (preg_match('/^fecha\s*,/i', $line)) continue; // encabezado
+            $cols = array_map('trim', str_getcsv($line));
+            $fecha = $this->normalizeDate($cols[0] ?? '');
+            $nombre = $cols[1] ?? '';
+            $anioRaw = $cols[2] ?? '';
+            if (!$fecha) { $errors[] = "Línea $lineNo: fecha inválida («{$cols[0]}»). Usa AAAA-MM-DD."; continue; }
+            if ($nombre === '') { $errors[] = "Línea $lineNo: falta el nombre del feriado."; continue; }
+            $anio = (int)($anioRaw !== '' ? $anioRaw : substr($fecha, 0, 4));
+            if ($anio < 2000 || $anio > 2100) { $errors[] = "Línea $lineNo: año inválido («$anioRaw»)."; continue; }
+            if ($anio != substr($fecha, 0, 4)) { $warns[] = "Línea $lineNo: el año ($anio) difiere de la fecha ($fecha); se usó el año de la fecha."; $anio = (int)substr($fecha, 0, 4); }
+            if (Feriado::exists($fecha)) { $skipped++; $warns[] = "Línea $lineNo: ya existe un feriado el $fecha, se omitió."; continue; }
+            $id = Feriado::add($fecha, mb_substr($nombre, 0, 120));
+            if ($id) $added++; else $errors[] = "Línea $lineNo: no se pudo guardar (posible duplicado).";
+        }
+        $_SESSION['admin_errors'] = $errors;
+        $_SESSION['admin_warns'] = $warns;
+        if ($added) $this->log('feriados_import', "$added agregados, $skipped omitidos");
+        $this->flash($added ? 'is-success' : ($errors ? 'is-danger' : 'is-warning'),
+                     "Feriados: $added guardado(s), $skipped omitido(s), " . count($errors) . " error(es).");
+        $this->redirect($back);
+    }
+
+    public function updateFeriado() {
+        $this->requireAuth(); $this->requireAdmin();
+        $p = $this->getPostData();
+        $back = '/admin?tab=feriados';
+        $id = (int)($p['id'] ?? 0);
+        $f = \App\Models\Feriado::find($id);
+        if (!$f) { $this->flash('is-danger', 'Feriado inexistente.'); $this->redirect($back); }
+        $fecha = $this->normalizeDate($p['fecha'] ?? '');
+        $nombre = trim($p['nombre'] ?? '');
+        if (!$fecha || $nombre === '') { $this->flash('is-danger', 'Fecha o nombre inválidos.'); $this->redirect($back); }
+        try {
+            $db = \Database::getConnection();
+            $chk = $db->prepare("SELECT id FROM feriados WHERE fecha = ? AND id <> ? LIMIT 1");
+            $chk->execute([$fecha, $id]);
+            if ($chk->fetchColumn()) { $this->flash('is-warning', "Ya existe otro feriado el $fecha."); $this->redirect($back); }
+            Feriado::update($id, $fecha, mb_substr($nombre, 0, 120));
+            $this->log('feriado_update', "#$id -> $fecha $nombre");
+            $this->flash('is-success', 'Feriado actualizado.');
+        } catch (\Throwable $e) {
+            $this->flash('is-danger', 'Error: ' . $e->getMessage());
+        }
+        $this->redirect($back);
+    }
+
+    public function deleteFeriado() {
+        $this->requireAuth(); $this->requireAdmin();
+        $p = $this->getPostData();
+        $id = (int)($p['id'] ?? 0);
+        if ($id && Feriado::remove($id)) {
+            $this->log('feriado_delete', "#$id");
+            $this->flash('is-success', 'Feriado eliminado.');
+        } else {
+            $this->flash('is-danger', 'No se encontró el feriado.');
+        }
+        $this->redirect('/admin?tab=feriados');
     }
 
     // ============================================================

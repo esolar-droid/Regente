@@ -80,4 +80,35 @@ class Feriado extends Model {
             return false;
         }
     }
+
+    /** Actualiza fecha/nombre/anio de un feriado existente. */
+    public static function update($id, $date, $nombre) {
+        try {
+            $db = \Database::getConnection();
+            $y = (int)substr($date, 0, 4);
+            return $db->prepare("UPDATE feriados SET fecha=?, nombre=?, anio=? WHERE id=?")
+                     ->execute([$date, $nombre, $y, (int)$id]);
+        } catch (\Throwable $e) {
+            error_log('Feriado update(): ' . $e->getMessage());
+            return false;
+        }
+    }
+
+    /** Todos los feriados (con filtro opcional por año) para el listado de Administración. */
+    public static function allForAdmin($year = null) {
+        try {
+            $db = \Database::getConnection();
+            if ($year) {
+                $stmt = $db->prepare("SELECT id, fecha, nombre, anio FROM feriados WHERE anio = ? ORDER BY fecha");
+                $stmt->execute([(int)$year]);
+            } else {
+                $stmt = $db->query("SELECT id, fecha, nombre, anio FROM feriados ORDER BY fecha");
+            }
+            return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+        } catch (\Throwable $e) {
+            error_log('Feriado allForAdmin(): ' . $e->getMessage());
+            return [];
+        }
+    }
+
 }

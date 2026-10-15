@@ -1,60 +1,43 @@
 <?php
 /**
- * Menú lateral de navegación
+ * Menú lateral de navegación — unificado con el menú superior.
  *
- * Las secciones se muestran según los permisos del usuario.
- * Algunas rutas apuntan a páginas que están en construcción
- * (marcadas con badge "pronto").
+ * Opciones (visibilidad según rol/permisos):
+ *   Inicio, Estudiantes, Asistencia, Mensajería, Reportes, Buscar, Administración.
  */
 
 $currentPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);
 
-$sections = [];
+$items = [];
 
 if (isAuthenticated()) {
-    $sections[] = [
-        'title' => 'General',
-        'items' => array_values(array_filter([
-            ['route' => '/dashboard', 'label' => 'Inicio', 'icon' => 'fas fa-home'],
-            can('view_events') ? ['route' => '/events?tab=masiva', 'label' => 'Registro de Eventos', 'icon' => 'fas fa-calendar-check'] : null,
-            can('view_reports') ? ['route' => '/reports', 'label' => 'Reportes', 'icon' => 'fas fa-chart-bar'] : null,
-        ])),
-    ];
+    $items[] = ['route' => '/dashboard', 'label' => 'Inicio', 'icon' => 'fas fa-home'];
 
-    if (can('view_students') || can('view_courses')) {
-        $sections[] = [
-            'title' => 'Académico',
-            'items' => array_values(array_filter([
-                can('view_students') ? ['route' => '/students', 'label' => 'Estudiantes', 'icon' => 'fas fa-user-graduate'] : null,
-                // «Cursos y Horarios» se renombró a «Buscar»: 3 columnas de
-                // consulta en tiempo real sobre la tabla horarios.
-                can('view_courses') ? ['route' => '/search', 'label' => 'Buscar', 'icon' => 'fas fa-search'] : null,
-                can('view_events') ? ['route' => '/events', 'label' => 'Eventos', 'icon' => 'fas fa-calendar-alt'] : null,
-            ])),
-        ];
+    if (can('view_students')) {
+        $items[] = ['route' => '/students', 'label' => 'Estudiantes', 'icon' => 'fas fa-user-graduate'];
+    }
+
+    // «Asistencia» = Registro de Eventos (masivo + individual)
+    if (can('view_events')) {
+        $items[] = ['route' => '/events', 'label' => 'Asistencia', 'icon' => 'fas fa-calendar-check'];
     }
 
     if (can('view_messages') || can('send_whatsapp')) {
-        $sections[] = [
-            'title' => 'Comunicación',
-            'items' => array_values(array_filter([
-                can('view_messages') ? ['route' => '/messages', 'label' => 'Hoja de Mensajería', 'icon' => 'fab fa-whatsapp'] : null,
-                can('send_whatsapp') ? ['route' => '/templates', 'label' => 'Plantillas', 'icon' => 'fas fa-file-alt', 'badge' => 'pronto'] : null,
-            ])),
-        ];
+        $items[] = ['route' => '/messages', 'label' => 'Mensajería', 'icon' => 'fab fa-whatsapp'];
     }
 
-    if (isAdmin() || can('view_users') || can('view_management')) {
-        $sections[] = [
-            'title' => 'Administración',
-            'items' => array_values(array_filter([
-                // Página central de administración (4 pestañas): solo administrador.
-                isAdmin() ? ['route' => '/admin', 'label' => 'Administración', 'icon' => 'fas fa-shield-alt'] : null,
-                can('view_users') ? ['route' => '/users', 'label' => 'Usuarios', 'icon' => 'fas fa-users-cog'] : null,
-                can('view_management') ? ['route' => '/management', 'label' => 'Gestión Escolar', 'icon' => 'fas fa-calendar-check'] : null,
-                can('view_professors') ? ['route' => '/professors', 'label' => 'Profesores', 'icon' => 'fas fa-user-tie', 'badge' => 'pronto'] : null,
-            ])),
-        ];
+    if (can('view_reports')) {
+        $items[] = ['route' => '/reports', 'label' => 'Reportes', 'icon' => 'fas fa-chart-bar'];
+    }
+
+    // «Buscar»: profesor / curso / asignatura en tiempo real (tabla horarios)
+    if (can('view_courses')) {
+        $items[] = ['route' => '/search', 'label' => 'Buscar', 'icon' => 'fas fa-search'];
+    }
+
+    // Panel exclusivo del administrador
+    if (isAdmin()) {
+        $items[] = ['route' => '/admin', 'label' => 'Administración', 'icon' => 'fas fa-shield-alt'];
     }
 }
 ?>
@@ -65,24 +48,17 @@ if (isAuthenticated()) {
     </div>
 
     <nav class="sidebar-nav">
-        <?php foreach ($sections as $section): ?>
-            <?php if (!empty($section['items'])): ?>
-                <p class="sidebar-section-title"><?= htmlspecialchars($section['title']) ?></p>
-                <?php foreach ($section['items'] as $item): ?>
-                    <?php
-                    $isActive = ($currentPath === $item['route']) ||
-                                ($item['route'] !== '/' && strpos($currentPath, rtrim($item['route'], '/')) === 0);
-                    ?>
-                    <a class="sidebar-link <?= $isActive ? 'is-active' : '' ?>"
-                       href="<?= htmlspecialchars($item['route']) ?>">
-                        <i class="<?= htmlspecialchars($item['icon']) ?>"></i>
-                        <span><?= htmlspecialchars($item['label']) ?></span>
-                        <?php if (!empty($item['badge'])): ?>
-                            <span class="sidebar-badge"><?= htmlspecialchars($item['badge']) ?></span>
-                        <?php endif; ?>
-                    </a>
-                <?php endforeach; ?>
-            <?php endif; ?>
+        <p class="sidebar-section-title">Navegación</p>
+        <?php foreach ($items as $item): ?>
+            <?php
+            $isActive = ($currentPath === $item['route']) ||
+                        ($item['route'] !== '/' && strpos($currentPath, rtrim($item['route'], '/')) === 0);
+            ?>
+            <a class="sidebar-link <?= $isActive ? 'is-active' : '' ?>"
+               href="<?= htmlspecialchars($item['route']) ?>">
+                <i class="<?= htmlspecialchars($item['icon']) ?>"></i>
+                <span><?= htmlspecialchars($item['label']) ?></span>
+            </a>
         <?php endforeach; ?>
     </nav>
 

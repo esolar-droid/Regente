@@ -37,6 +37,9 @@ $warns  = $_SESSION['admin_warns'] ?? [];  unset($_SESSION['admin_warns']);
         <li class="<?= $curTab === 'horarios' ? 'is-active' : '' ?>">
           <a href="/admin?tab=horarios"><span class="icon"><i class="fas fa-calendar-week"></i></span><span>Horarios y profesores</span></a>
         </li>
+        <li class="<?= $curTab === 'feriados' ? 'is-active' : '' ?>">
+          <a href="/admin?tab=feriados"><span class="icon"><i class="fas fa-umbrella-beach"></i></span><span>Feriados</span></a>
+        </li>
         <li class="<?= $curTab === 'gestion' ? 'is-active' : '' ?>">
           <a href="/admin?tab=gestion"><span class="icon"><i class="fas fa-school"></i></span><span>Gestión escolar</span></a>
         </li>
@@ -302,6 +305,115 @@ S3B,Maria Lopez,Miercoles,10:00,11:30,Fisica-Quimica,<?= (int)$anioSel ?>"></tex
             </div>
           </form>
         </section>
+      </div>
+    </div>
+    <?php endif; ?>
+    <?php endif; ?>
+
+    <!-- =========================================================
+         PESTAÑA 2b — FERIADOS (CSV plano + listado con lápiz/papelera)
+         ========================================================= -->
+    <?php if ($curTab === 'feriados'): ?>
+    <div class="columns">
+      <div class="column is-7">
+        <div class="box">
+          <p class="title is-5"><i class="fas fa-cloud-sun-rain"></i>&nbsp; Carga masiva de feriados</p>
+          <p class="is-size-7 has-text-grey mb-3">
+            Formato CSV separado por comas: <code>fecha,nombre,anio</code>. Se aceptan fechas
+            AAAA-MM-DD o DD/MM/AAAA. Encabezado y líneas que empiezan con # se ignoran.
+            Los duplicados por fecha se omiten con aviso.
+          </p>
+          <form method="post" action="/admin/feriados/import">
+            <input type="hidden" name="csrf_token" value="<?= $h($csrf_token) ?>">
+            <div class="field">
+              <div class="control">
+                <textarea class="textarea" name="csv_text" rows="8"
+                  placeholder="2027-01-01,Año Nuevo,2027&#10;2027-05-01,Día del Trabajo,2027"></textarea>
+              </div>
+            </div>
+            <div class="field is-grouped">
+              <div class="control">
+                <button class="button is-link"><i class="fas fa-save"></i>&nbsp; Guardar</button>
+              </div>
+              <div class="control">
+                <a class="button is-light" href="/admin/feriados/plantilla.csv">
+                  <i class="fas fa-file-download"></i>&nbsp; Descargar plantilla CSV
+                </a>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="column is-5">
+        <div class="box">
+          <p class="title is-5">Feriados del año <?= $h($anioSel ?? date('Y')) ?></p>
+          <div class="select is-small mb-3">
+            <form method="get" action="/admin" style="display:inline-flex;gap:.5rem">
+              <input type="hidden" name="tab" value="feriados">
+              <input class="input is-small" type="number" name="anio" min="2000" max="2100"
+                     value="<?= $h($anioSel ?? date('Y')) ?>" style="width:7rem">
+              <button class="button is-small is-link">Ver</button>
+            </form>
+          </div>
+          <table class="table is-fullwidth is-narrow">
+            <thead><tr><th>Fecha</th><th>Nombre</th><th></th></tr></thead>
+            <tbody>
+            <?php if (empty($feriados)): ?>
+              <tr><td colspan="3" class="has-text-centered has-text-grey py-4">Sin feriados registrados este año.</td></tr>
+            <?php else: foreach ($feriados as $f): ?>
+              <tr>
+                <td><?= $h($f['fecha']) ?></td>
+                <td><?= $h($f['nombre']) ?></td>
+                <td class="has-text-right is-pulled-right">
+                  <a class="button is-small is-light" title="Editar"
+                     href="/admin?tab=feriados&amp;editar=<?= (int)$f['id'] ?>">
+                    <span class="icon"><i class="fas fa-pen"></i></span></a>
+                  <form method="post" action="/admin/feriados/delete" style="display:inline"
+                        onsubmit="return confirm('¿Eliminar el feriado del <?= $h($f['fecha']) ?>?');">
+                    <input type="hidden" name="csrf_token" value="<?= $h($csrf_token) ?>">
+                    <input type="hidden" name="id" value="<?= (int)$f['id'] ?>">
+                    <button class="button is-small is-danger is-light" title="Eliminar">
+                      <span class="icon"><i class="fas fa-trash"></i></span></button>
+                  </form>
+                </td>
+              </tr>
+            <?php endforeach; endif; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <?php if (!empty($editFeriado)): $ef = $editFeriado; ?>
+    <!-- Modal de edición de feriado -->
+    <div class="modal is-active">
+      <div class="modal-background" onclick="location.href='/admin?tab=feriados'"></div>
+      <div class="modal-card">
+        <header class="modal-card-head">
+          <p class="modal-card-title">Editar feriado #<?= (int)$ef->id ?></p>
+          <button class="delete" aria-label="cerrar" onclick="location.href='/admin?tab=feriados'"></button>
+        </header>
+        <form method="post" action="/admin/feriados/update">
+          <input type="hidden" name="csrf_token" value="<?= $h($csrf_token) ?>">
+          <input type="hidden" name="id" value="<?= (int)$ef->id ?>">
+          <section class="modal-card-body">
+            <div class="field">
+              <label class="label">Fecha</label>
+              <div class="control"><input class="input" type="date" name="fecha" required
+                     value="<?= $h($ef->fecha) ?>"></div>
+            </div>
+            <div class="field">
+              <label class="label">Nombre</label>
+              <div class="control"><input class="input" type="text" name="nombre" required maxlength="120"
+                     value="<?= $h($ef->nombre) ?>"></div>
+            </div>
+          </section>
+          <footer class="modal-card-foot">
+            <button class="button is-link">Guardar cambios</button>
+            <a class="button is-light" href="/admin?tab=feriados">Cancelar</a>
+          </footer>
+        </form>
       </div>
     </div>
     <?php endif; ?>
