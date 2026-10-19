@@ -646,3 +646,30 @@ body.sidebar-collapsed .app-body {
     max-width: 100%;
 }
 .section > .container { max-width: 100%; }
+
+/* ===== Reportes (hoja con 6 pestañas) ===== */
+.rep-doc { border-top: 4px solid #1B3A6B; }
+.rep-doc-head { display:flex; align-items:center; gap:12px; margin-bottom:10px; border-bottom:2px solid #1B3A6B; padding-bottom:8px; }
+.rep-doc-head .rep-logo { height:46px; max-width:220px; object-fit:contain; }
+.rep-school { color:#1B3A6B; font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:.9rem; }
+.rep-title { font-weight:700; font-size:1.15rem; }
+.rep-table td, .rep-table th { text-align:center; vertical-align:middle; }
+.rep-table .rep-name { text-align:left; white-space:nowrap; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
+.rep-table .rep-num { width:2.2em; color:#64748b; }
+.rep-table th { background:#1B3A6B !important; }
+.mark-P { background:rgba(46,204,113,.30); }
+.mark-A { background:rgba(243,156,18,.45); font-weight:700; }
+.mark-L { background:rgba(52,152,219,.40); font-weight:700; }
+.mark-F { background:rgba(231,76,60,.45); font-weight:700; color:#7a0f0f; }
+.rep-inh { background:#d9dde3 !important; }
+.sumcell { background:#eef2f7; font-weight:700; }
+.rep-sumrow td { background:#eef2f7; }
+.rep-total { background:#e3ebf5 !important; }
+.rep-legend { font-size:.8rem; color:#333; border-top:1px dashed #9aa7b8; padding-top:6px; margin-top:8px; }
+.rep-course-block { margin-bottom:1.5rem; }
+.rep-course-title { color:#1B3A6B; }
+.marksum { padding:2px 8px; border-radius:4px; font-weight:700; display:inline-block; margin-right:4px; }
+.is-success-light-bg { background:rgba(46,204,113,.30); }
+tr.is-inhabil td { font-style:italic; }
+.rep-days th, .rep-days td { padding-left:4px; padding-right:4px; font-size:.82rem; }
+.rep-anual th, .rep-anual td { font-size:.78rem; padding:2px 4px; }
