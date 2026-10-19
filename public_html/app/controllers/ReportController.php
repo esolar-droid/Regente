@@ -27,8 +27,12 @@ class ReportController extends Controller {
 
     const LOGO_URL = 'https://colmarista.com/wp-content/uploads/2026/10/logohorizontal.png';
 
-    private const MES_ES = [1=>'Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
-    private const DIA_ES = [1=>'Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
+    // v16.2: MES_ES/DIA_ES 0-based ([0=>Ene...[11=>Dic]) para que json_encode
+    // los serialice como ARRAY (lista) y no como OBJETO JSON. Con claves 1..12
+    // PHP los convertía en {"1":"Ene",...} y Chart.js recibía un objeto como
+    // labels/datos -> ejes duplicados ("Ene..Dic" + "1..12") y celdas vacías.
+    const MES_ES = ['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
+    const DIA_ES = ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'];
 
     /** Día hábil estándar del sistema: Lunes a Viernes (sin feriados). */
     private function businessDays($from, $to) {
@@ -247,7 +251,7 @@ class ReportController extends Controller {
 
         return [
             'kind' => 'mensual',
-            'header' => ['curso' => $course ? $course->curso : ('#' . $cid), 'mes' => self::MES_ES[$month] . ' ' . $year],
+            'header' => ['curso' => $course ? $course->curso : ('#' . $cid), 'mes' => self::MES_ES[$month-1] . ' ' . $year],
             'roster' => $roster, 'days' => $days, 'bdays' => $bdays, 'grid' => $grid,
             'totals' => Report::totals($grid), 'marks' => $marks,
             'chart' => $this->dailyChart($ids, $first, $last, $bdays),
@@ -283,12 +287,12 @@ class ReportController extends Controller {
         if (!$roster) return ['error' => 'No hay estudiantes activos en el curso seleccionado.'];
         $ids   = array_map(fn($s) => (int)$s['id'], $roster);
         $marks = Report::marks($ids, $from, $to);
-        $bdays = $this->businessDays($from, $to);
+        $bdays = $this->businessDays($from, $to); // strings ISO (los metadatos van en 'days')
 
         $days = [];
         foreach ($bdays as $d) {
             $ts = strtotime($d);
-            $days[] = ['f' => $d, 'm' => self::MES_ES[(int)date('n', $ts)], 'n' => (int)date('j', $ts),
+            $days[] = ['f' => $d, 'm' => self::MES_ES[(int)date('n', $ts)-1], 'n' => (int)date('j', $ts),
                        'w' => self::DIA_ES[(int)date('N', $ts) - 1]];
         }
         $grid = Report::matrix($roster, $bdays, $marks);
@@ -309,27 +313,35 @@ class ReportController extends Controller {
         $year = (int)($q['anio'] ?? Report::activeManagement()['anio']);
         if (!$cid) return ['error' => 'Selecciona un curso.'];
 
-        $roster = Report::roster($cid);
-        if (!$roster) return ['error' => 'No hay estudiantes activos en el curso seleccionado.'];
+        // v16.3: la nomina se lista de la gestion del anio consultado (antes
+        // siempre usaba la gestion activa -> reportes anuales de anios pasados
+        // salian vacios o con estudiantes equivocados).
+        $roster = Report::roster($cid, $year);
+        if (!$roster) return ['error' => 'No hay estudiantes en el curso seleccionado para esa gestion.'];
         $ids   = array_map(fn($s) => (int)$s['id'], $roster);
         $from  = sprintf('%04d-01-01', $year);
         $to    = sprintf('%04d-12-31', $year);
-        $marks = Report::marks($ids, $from, $to);
+
+        // v16.3 FIX memory-exhausted: los totales mensuales se agregan EN SQL
+        // (marksAgg con GROUP BY). Antes marks() traia TODAS las filas del ano
+        // y cada rebuild (pantalla, CSV y PDF) las expandia en arrays PHP de
+        // estudiante x fecha x tipo -> 500+ MB en colegios con mucha asistencia.
+        $agg = Report::marksAgg($ids, $from, $to);
 
         $perStudent = [];
-        // v16.1: arrays 0-based para los gráficos (los índices 1..12 de
-        // array_fill generaban etiquetas numéricas extra en el eje X).
         $grand = ['A'=>array_fill(0,12,0),'L'=>array_fill(0,12,0),'F'=>array_fill(0,12,0)];
         foreach ($roster as $s) {
             $sid = (int)$s['id'];
-            $mo = [];
-            for ($m = 0; $m < 12; $m++) $mo[$m] = ['A'=>0,'L'=>0,'F'=>0];
-            foreach (($marks[$sid] ?? []) as $d => $mm) {
-                $m = ((int)substr($d, 5, 2)) - 1;
-                if ($m >= 0 && $m < 12) { $mo[$m][$mm['t']]++; $grand[$mm['t']][$m]++; }
-            }
+            $mo  = [];
             $tot = ['A'=>0,'L'=>0,'F'=>0];
-            foreach ($mo as $v) foreach ($v as $k => $x) $tot[$k] += $x;
+            for ($m = 0; $m < 12; $m++) {
+                $row = ['A'=>0,'L'=>0,'F'=>0];
+                foreach (['A','L','F'] as $k) {
+                    $row[$k] = (int)($agg[$sid][$m][$k] ?? 0);
+                    if ($row[$k]) { $grand[$k][$m] += $row[$k]; $tot[$k] += $row[$k]; }
+                }
+                $mo[$m] = $row;
+            }
             $perStudent[] = ['id' => $sid, 'nombre' => $s['nombre_completo'], 'mes' => $mo, 'tot' => $tot];
         }
         $course = Course::find($cid);
@@ -453,7 +465,7 @@ class ReportController extends Controller {
                 $rows[] = $head;
                 foreach ($r['perStudent'] as $p) {
                     $line = [$p['nombre']];
-                    for ($m = 1; $m <= 12; $m++) {
+                    for ($m = 0; $m < 12; $m++) {
                         $line[] = self::z($p['mes'][$m]['A']);
                         $line[] = self::z($p['mes'][$m]['L']);
                         $line[] = self::z($p['mes'][$m]['F']);
@@ -507,8 +519,11 @@ class ReportController extends Controller {
 
         // Blindaje anti-página-en-blanco: capturar todo error fatal y mostrarlo
         // dentro de la propia ventana de impresión en vez de truncar el HTML.
-        ini_set('display_errors', '1');
-        error_reporting(E_ALL);
+        // v16.2: no imprimir warnings dentro del HTML (rompen headers y ensucian
+        // el PDF). El shutdown handler usa ob_get_clean()+echo, así que mostrar
+        // errores inline solo generaba "Cannot modify header information".
+        ini_set('display_errors', '0');
+        error_reporting(E_ALL & ~E_WARNING & ~E_NOTICE & ~E_DEPRECATED);
         ob_start();
         register_shutdown_function(function () use (&$obLevel) {
             $err = error_get_last();
@@ -526,6 +541,9 @@ class ReportController extends Controller {
         $obLevel = ob_get_level();
 
         try {
+            // v16.3: techo de memoria explícito para este request
+            // (hosting suele venir en 128M; con el agregado SQL basta con 256M).
+            @ini_set('memory_limit', '512M');
             $r = $this->rebuild($_GET);
             if (!$r || !empty($r['error'])) {
                 ob_end_clean();

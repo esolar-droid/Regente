@@ -67,8 +67,11 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
   .doc-meta { color:#555; font-size:9.5px; }
   table.grid { width:100%; border-collapse:collapse; }
   table.grid th, table.grid td { border:1px solid #9aa7b8; padding:2px 3px; text-align:center; }
-  table.grid th { background:var(--navy); color:#fff; font-size:8.5px; line-height:1.15; }
-  table.grid td.name { text-align:left; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; font-size:9px; }
+  table.grid th { background:var(--navy); color:#fff; line-height:1.15; }
+  table.grid th, table.grid td,
+  table.grid th small, table.grid td small,
+  table.grid .name, table.grid .sumcell { font-size:9pt !important; } /* v16.3: fuente uniforme 9pt en todo el cuerpo de tabla */
+  table.grid td.name { text-align:left; white-space:nowrap; max-width:180px; overflow:hidden; text-overflow:ellipsis; }
   table.grid tr:nth-child(even) td { background:#f4f7fb; }
   .mark-P { background:rgba(46,204,113,.30); }
   .mark-A { background:rgba(243,156,18,.45); font-weight:bold; }
@@ -214,14 +217,14 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
       <tbody>
         <?php foreach ($result['perStudent'] as $p): ?>
           <tr><td class="name"><?= $h($p['nombre']) ?></td>
-            <?php for ($m = 1; $m <= 12; $m++): ?>
+            <?php for ($m = 0; $m < 12; $m++): ?>
               <td class="sumcell"><?= $h($z($p['mes'][$m]['A'])) ?></td><td class="sumcell"><?= $h($z($p['mes'][$m]['L'])) ?></td><td class="sumcell"><?= $h($z($p['mes'][$m]['F'])) ?></td>
             <?php endfor; ?>
             <td class="sumcell"><?= $h($z($p['tot']['A'])) ?></td><td class="sumcell"><?= $h($z($p['tot']['L'])) ?></td><td class="sumcell"><?= $h($z($p['tot']['F'])) ?></td></tr>
         <?php endforeach; ?>
       </tbody>
       <tfoot><tr><td class="name">CURSO</td>
-        <?php for ($m = 1; $m <= 12; $m++): ?>
+        <?php for ($m = 0; $m < 12; $m++): ?>
           <td><?= $h($z($result['grand']['A'][$m])) ?></td><td><?= $h($z($result['grand']['L'][$m])) ?></td><td><?= $h($z($result['grand']['F'][$m])) ?></td>
         <?php endfor; ?><td colspan="3"></td></tr></tfoot>
     </table>
@@ -230,9 +233,9 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
       <div class="charts" id="chartArea"></div>
       <script>window.REP_CHARTS = [
         {type:'bar', labels:<?= json_encode(array_values($mesEs)) ?>, series:[
-          {label:'A', data:<?= json_encode($result['grand']['A']) ?>, color:'#F39C12'},
-          {label:'L', data:<?= json_encode($result['grand']['L']) ?>, color:'#3498DB'},
-          {label:'F', data:<?= json_encode($result['grand']['F']) ?>, color:'#E74C3C'}], title:'Mensual curso'},
+          {label:'A', data:<?= json_encode(array_values($result['grand']['A'])) ?>, color:'#F39C12'},
+          {label:'L', data:<?= json_encode(array_values($result['grand']['L'])) ?>, color:'#3498DB'},
+          {label:'F', data:<?= json_encode(array_values($result['grand']['F'])) ?>, color:'#E74C3C'}], title:'Mensual curso'},
         {type:'pie', labels:['Atrasos','Licencias','Faltas'], data:[<?= array_sum($result['grand']['A']) ?>,<?= array_sum($result['grand']['L']) ?>,<?= array_sum($result['grand']['F']) ?>], colors:['#F39C12','#3498DB','#E74C3C'], title:'ALF total gestión'}];</script>
     <?php endif; ?>
   </div>

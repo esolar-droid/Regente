@@ -458,7 +458,7 @@ function repHeader($h, $title) { ?>
               <tbody>
                 <?php foreach ($res['perStudent'] as $p): ?>
                   <tr><td class="rep-name"><?= $h($p['nombre']) ?></td>
-                    <?php for ($m = 1; $m <= 12; $m++): ?>
+                    <?php for ($m = 0; $m < 12; $m++): ?>
                       <td class="sumcell"><?= $z($p['mes'][$m]['A']) ?></td><td class="sumcell"><?= $z($p['mes'][$m]['L']) ?></td><td class="sumcell"><?= $z($p['mes'][$m]['F']) ?></td>
                     <?php endfor; ?>
                     <td class="sumcell rep-total"><?= $z($p['tot']['A']) ?></td><td class="sumcell rep-total"><?= $z($p['tot']['L']) ?></td><td class="sumcell rep-total"><?= $z($p['tot']['F']) ?></td>
@@ -466,7 +466,7 @@ function repHeader($h, $title) { ?>
                 <?php endforeach; ?>
               </tbody>
               <tfoot><tr class="rep-sumrow"><td class="rep-name"><strong>Curso</strong></td>
-                <?php for ($m = 1; $m <= 12; $m++): ?>
+                <?php for ($m = 0; $m < 12; $m++): ?>
                   <td><?= $z($res['grand']['A'][$m]) ?></td><td><?= $z($res['grand']['L'][$m]) ?></td><td><?= $z($res['grand']['F'][$m]) ?></td>
                 <?php endfor; ?>
                 <td colspan="3"></td></tr></tfoot>
@@ -480,7 +480,7 @@ function repHeader($h, $title) { ?>
           </div>
           <script>window.REP_ANUAL = <?= json_encode([
               'labels' => array_values($mesEs),
-              'A' => $res['grand']['A'], 'L' => $res['grand']['L'], 'F' => $res['grand']['F'],
+              'A' => array_values($res['grand']['A']), 'L' => array_values($res['grand']['L']), 'F' => array_values($res['grand']['F']),
               'torta' => ['labels'=>['Atrasos','Licencias','Faltas'],
                           'data'=>[array_sum($res['grand']['A']), array_sum($res['grand']['L']), array_sum($res['grand']['F'])]],
           ], JSON_UNESCAPED_UNICODE); ?>;</script>

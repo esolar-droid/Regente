@@ -22,17 +22,30 @@ class Report {
     }
 
     /** Nómina activa de un curso (mismo criterio que el registro masivo). */
-    public static function roster($courseId) {
+    public static function roster($courseId, $anio = null) {
         try {
             $db = \Database::getConnection();
-            $stmt = $db->prepare(
-                "SELECT e.id, e.nombre_completo, e.codigo_bnb
-                 FROM estudiantes e
-                 JOIN gestion g ON g.anio = YEAR(CURDATE()) AND g.estado = 'activa'
-                 WHERE e.id_curso = ? AND e.id_gestion = g.id AND e.estado <> 'retirado'
-                 ORDER BY e.nombre_completo"
-            );
-            $stmt->execute([(int)$courseId]);
+            // v16.3: si se indica $anio explicito (reporte anual de otra gestion),
+            // se lista la nomina de esa gestion; si no, la gestion activa actual.
+            if ($anio !== null) {
+                $stmt = $db->prepare(
+                    "SELECT e.id, e.nombre_completo, e.codigo_bnb
+                     FROM estudiantes e
+                     JOIN gestion g ON g.anio = ?
+                     WHERE e.id_curso = ? AND e.id_gestion = g.id AND e.estado <> 'retirado'
+                     ORDER BY e.nombre_completo"
+                );
+                $stmt->execute([(int)$anio, (int)$courseId]);
+            } else {
+                $stmt = $db->prepare(
+                    "SELECT e.id, e.nombre_completo, e.codigo_bnb
+                     FROM estudiantes e
+                     JOIN gestion g ON g.anio = YEAR(CURDATE()) AND g.estado = 'activa'
+                     WHERE e.id_curso = ? AND e.id_gestion = g.id AND e.estado <> 'retirado'
+                     ORDER BY e.nombre_completo"
+                );
+                $stmt->execute([(int)$courseId]);
+            }
             return $stmt->fetchAll(\PDO::FETCH_ASSOC);
         } catch (\Throwable $e) {
             error_log('Report.roster: ' . $e->getMessage());
@@ -135,6 +148,42 @@ class Report {
         }
     }
 
+    /**
+     * v16.3: totales A/L/F por estudiante y mes, agregados EN SQL.
+     * Devuelve [id_estudiante][mes 0..11] => ['A'=>n,'L'=>n,'F'=>n].
+     * Reemplaza a marks() en el reporte anual: antes se traian TODAS las filas
+     * del ano por cada rebuild (pantalla+CSV+PDF) y PHP las expandia en arrays
+     * gigantes -> "Allowed memory size exhausted". Con GROUP BY solo llegan
+     * ~12 filas por estudiante y la memoria es O(nomina), no O(eventos*copias).
+     */
+    public static function marksAgg(array $studentIds, $from, $to) {
+        $ids = array_values(array_filter(array_map('intval', $studentIds)));
+        if (!$ids || !$from || !$to) return [];
+        try {
+            $db = \Database::getConnection();
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare(
+                "SELECT id_estudiante, MONTH(fecha_evento) AS m, tipo_evento, COUNT(*) AS n
+                 FROM eventos
+                 WHERE fecha_evento BETWEEN ? AND ? AND id_estudiante IN ($ph)
+                 GROUP BY id_estudiante, MONTH(fecha_evento), tipo_evento"
+            );
+            $stmt->execute(array_merge([$from, $to], $ids));
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $short = Event::typeToShort($r['tipo_evento']);
+                if ($short === 'P' || $short === '') continue; // solo A/L/F
+                $m = ((int)$r['m']) - 1;
+                if ($m < 0 || $m > 11) continue;
+                $out[(int)$r['id_estudiante']][$m][$short] = (int)$r['n'];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            error_log('Report.marksAgg: ' . $e->getMessage());
+            return [];
+        }
+    }
+
     /** Mapa fecha=>nombre de feriados dentro de un rango. */
     public static function holidayMap($from, $to) {
         try {
@@ -183,13 +232,19 @@ class Report {
      * aparte ($extraMarks) para que ningún registro quede invisible en PDF.
      */
     public static function matrix(array $roster, array $businessDays, array $marks) {
+        // v16.2: soporta días en formato 'YYYY-MM-DD' o arrays ['f'=>...].
+        // (lapso pasa $bdays como arrays -> antes $marks[$sid][array] reventaba
+        //  con "Undefined array key 0" y tipos erróneos.)
+        // Clave de celda = fecha ISO normalizada (funciona con días pasados
+        // como string o como array ['f'=>...]).
         $grid = [];
         foreach ($roster as $st) {
             $sid = (int)$st['id'];
             $row = [];
-            foreach ($businessDays as $d) {
-                $m = $marks[$sid][$d] ?? null;
-                $row[$d] = ['t' => $m ? $m['t'] : 'P', 'j' => $m ? $m['j'] : ''];
+            foreach (array_values($businessDays) as $d) {
+                $iso = is_array($d) ? (string)($d['f'] ?? '') : (string)$d;
+                $m = $marks[$sid][$iso] ?? null;
+                $row[$iso] = ['t' => $m ? $m['t'] : 'P', 'j' => $m ? $m['j'] : ''];
             }
             $grid[$sid] = $row;
         }

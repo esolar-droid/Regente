@@ -654,6 +654,8 @@ body.sidebar-collapsed .app-body {
 .rep-school { color:#1B3A6B; font-weight:700; text-transform:uppercase; letter-spacing:.5px; font-size:.9rem; }
 .rep-title { font-weight:700; font-size:1.15rem; }
 .rep-table td, .rep-table th { text-align:center; vertical-align:middle; }
+/* v16.2: tamaño de fuente uniforme en todas las rejillas de reportes (9pt) */
+.rep-table, .rep-table th, .rep-table td, .rep-table .rep-name, .rep-table .sumcell, .rep-table small { font-size: 9pt !important; }
 .rep-table .rep-name { text-align:left; white-space:nowrap; max-width:230px; overflow:hidden; text-overflow:ellipsis; }
 .rep-table .rep-num { width:2.2em; color:#64748b; }
 .rep-table th { background:#1B3A6B !important; }
@@ -671,5 +673,5 @@ body.sidebar-collapsed .app-body {
 .marksum { padding:2px 8px; border-radius:4px; font-weight:700; display:inline-block; margin-right:4px; }
 .is-success-light-bg { background:rgba(46,204,113,.30); }
 tr.is-inhabil td { font-style:italic; }
-.rep-days th, .rep-days td { padding-left:4px; padding-right:4px; font-size:.82rem; }
-.rep-anual th, .rep-anual td { font-size:.78rem; padding:2px 4px; }
+.rep-days th, .rep-days td { padding-left:4px; padding-right:4px; /* v16.2: fuente uniforme via regla .rep-table 9pt */ }
+.rep-anual th, .rep-anual td { padding:2px 4px; /* v16.2: fuente uniforme via regla .rep-table 9pt */ }
