@@ -36,13 +36,33 @@
 
         function render() {
             if (!items.length) { close(); return; }
+            // data-suggest-select="#hiddenId,#otroCampo": al elegir un item se
+            // rellenan esos campos ocultos con item.id en vez de navegar a su URL.
+            var selTargets = input.dataset.suggestSelect || '';
             box.innerHTML = items.map(function (it, i) {
-                return '<a class="suggest-item' + (i === idx ? ' is-active' : '') + '" href="' + it.url + '">' +
+                var href = selTargets ? 'javascript:void(0)' : (it.url || 'javascript:void(0)');
+                return '<a class="suggest-item' + (i === idx ? ' is-active' : '') + '" href="' + href + '"' +
+                    (selTargets && it.id != null ? ' data-id="' + esc(it.id) + '"' : '') + '>' +
                     '<span class="suggest-label">' + esc(it.label) + '</span>' +
                     (it.sub ? '<span class="suggest-sub">' + esc(it.sub) + '</span>' : '') +
                     '</a>';
             }).join('');
             box.hidden = false;
+        }
+
+        function choose(el) {
+            if (!el) return;
+            var id = el.getAttribute('data-id');
+            if (id == null) return;
+            var labelEl = el.querySelector('.suggest-label');
+            if (labelEl) input.value = labelEl.textContent;
+            (input.dataset.suggestSelect || '').split(',').forEach(function (s) {
+                s = s.trim();
+                if (!s) return;
+                var t = document.querySelector(s);
+                if (t) t.value = id;
+            });
+            close();
         }
 
         function esc(s) {
@@ -72,12 +92,27 @@
             timer = setTimeout(function () { fetchSuggest(q); }, 250);
         });
 
+        box.addEventListener('click', function (ev) {
+            var el = ev.target.closest ? ev.target.closest('.suggest-item') : null;
+            if (el && el.getAttribute('data-id') != null) {
+                ev.preventDefault();
+                choose(el);
+            }
+        });
+
         input.addEventListener('keydown', function (e) {
             if (box.hidden || !items.length) return;
             if (e.key === 'ArrowDown') { e.preventDefault(); idx = Math.min(idx + 1, items.length - 1); render(); }
             else if (e.key === 'ArrowUp') { e.preventDefault(); idx = Math.max(idx - 1, 0); render(); }
             else if (e.key === 'Escape') { close(); }
-            else if (e.key === 'Enter' && idx >= 0) { e.preventDefault(); window.location.href = items[idx].url; }
+            else if (e.key === 'Enter' && idx >= 0) {
+                e.preventDefault();
+                if (input.dataset.suggestSelect) { // modo selector: rellena y deja listo el form
+                    choose(box.querySelector('.suggest-item.is-active'));
+                } else {
+                    window.location.href = items[idx].url;
+                }
+            }
         });
 
         document.addEventListener('click', function (ev) {

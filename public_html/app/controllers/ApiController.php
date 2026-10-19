@@ -89,6 +89,7 @@ class ApiController extends Controller {
                 $st->execute($params);
                 foreach ($st->fetchAll(\PDO::FETCH_ASSOC) as $r) {
                     $out[] = [
+                        'id'    => (int)$r['id'],
                         'label' => $r['nombre_completo'],
                         'sub'   => trim(($r['curso_nombre'] ?? '') . ($r['codigo_bnb'] ? ' · ' . $r['codigo_bnb'] : ''), ' ·'),
                         'url'   => '/students/' . (int)$r['id'],

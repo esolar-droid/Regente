@@ -288,7 +288,7 @@ class ReportController extends Controller {
         $days = [];
         foreach ($bdays as $d) {
             $ts = strtotime($d);
-            $days[] = ['f' => $d, 'm' => self::MES_ES[(int)date('n', $ts)], 'n' => (int)date('j', $d),
+            $days[] = ['f' => $d, 'm' => self::MES_ES[(int)date('n', $ts)], 'n' => (int)date('j', $ts),
                        'w' => self::DIA_ES[(int)date('N', $ts) - 1]];
         }
         $grid = Report::matrix($roster, $bdays, $marks);
@@ -317,14 +317,16 @@ class ReportController extends Controller {
         $marks = Report::marks($ids, $from, $to);
 
         $perStudent = [];
-        $grand = ['A'=>array_fill(1,12,0),'L'=>array_fill(1,12,0),'F'=>array_fill(1,12,0)];
+        // v16.1: arrays 0-based para los gráficos (los índices 1..12 de
+        // array_fill generaban etiquetas numéricas extra en el eje X).
+        $grand = ['A'=>array_fill(0,12,0),'L'=>array_fill(0,12,0),'F'=>array_fill(0,12,0)];
         foreach ($roster as $s) {
             $sid = (int)$s['id'];
             $mo = [];
-            for ($m = 1; $m <= 12; $m++) $mo[$m] = ['A'=>0,'L'=>0,'F'=>0];
+            for ($m = 0; $m < 12; $m++) $mo[$m] = ['A'=>0,'L'=>0,'F'=>0];
             foreach (($marks[$sid] ?? []) as $d => $mm) {
-                $m = (int)substr($d, 5, 2);
-                if ($m >= 1 && $m <= 12) { $mo[$m][$mm['t']]++; $grand[$mm['t']][$m]++; }
+                $m = ((int)substr($d, 5, 2)) - 1;
+                if ($m >= 0 && $m < 12) { $mo[$m][$mm['t']]++; $grand[$mm['t']][$m]++; }
             }
             $tot = ['A'=>0,'L'=>0,'F'=>0];
             foreach ($mo as $v) foreach ($v as $k => $x) $tot[$k] += $x;
@@ -478,27 +480,111 @@ class ReportController extends Controller {
     // Exportación PDF: plantilla standalone (impresión del navegador)
     // ====================================================================
     public function exportPdf() {
+        // v16.1: doble candado. Rutas autenticadas -> requireAuth+guard normal.
+        // Ruta pública /reports/export/pdf.html -> solo sirve el archivo si el
+        // token _k coincide con la ruta derivada (sin sesión no hay rebuild).
+        if (!empty($_GET['_p'])) {
+            $key  = preg_replace('/[^a-f0-9]/', '', (string)($_GET['_k'] ?? ''));
+            $file = sys_get_temp_dir() . '/repdf-' . preg_replace('/[^a-f0-9]/', '', md5($key)) . '.html';
+            if (!is_file($file)) {
+                http_response_code(404);
+                header('Content-Type: text/html; charset=UTF-8');
+                echo '<p>El reporte expiró. Vuelve a Reportes y genera el PDF otra vez.</p>';
+                exit;
+            }
+            if (!isAuthenticated()) { $this->requireAuth(); } // redirige a login
+            if (!isAdmin() && !isRegente()) { $this->redirect('/403'); }
+            header('Content-Type: text/html; charset=UTF-8');
+            readfile($file);
+            exit;
+        }
         $this->guard();
-        $r = $this->rebuild($_GET);
-        if (!$r || !empty($r['error'])) {
-            http_response_code(400);
-            header('Content-Type: text/html; charset=utf-8');
-            echo '<h2>No hay reporte para exportar</h2><p>' . htmlspecialchars($r['error'] ?? 'parámetros inválidos') . '</p>';
+
+        // El navegador abre la ventana de impresión en segundo plano y congela
+        // los JS inline hasta que se enfoca -> si window.print() corre temprano
+        // imprime una hoja con solo el encabezado. Solución: renderizar TODO el
+        // contenido como HTML estático e imprimir recién al activarse la pestaña.
+
+        // Blindaje anti-página-en-blanco: capturar todo error fatal y mostrarlo
+        // dentro de la propia ventana de impresión en vez de truncar el HTML.
+        ini_set('display_errors', '1');
+        error_reporting(E_ALL);
+        ob_start();
+        register_shutdown_function(function () use (&$obLevel) {
+            $err = error_get_last();
+            if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_COMPILE_ERROR], true)) {
+                while (ob_get_level() > $obLevel) { ob_end_clean(); }
+                http_response_code(200);
+                header('Content-Type: text/html; charset=UTF-8');
+                echo '<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Error al generar PDF</title></head>'
+                   . '<body style="font-family:Arial;padding:30px">'
+                   . '<h2 style="color:#c0392b">No se pudo generar el reporte</h2><pre style="background:#faf3f0;padding:12px;border-radius:6px;white-space:pre-wrap">'
+                   . htmlspecialchars($err['message'] . ' @ ' . $err['file'] . ':' . $err['line'])
+                   . '</pre><p>Vuelve atrás y reintenta, o exporta el CSV.</p></body></html>';
+            }
+        });
+        $obLevel = ob_get_level();
+
+        try {
+            $r = $this->rebuild($_GET);
+            if (!$r || !empty($r['error'])) {
+                ob_end_clean();
+                http_response_code(400);
+                header('Content-Type: text/html; charset=utf-8');
+                echo '<h2>No hay reporte para exportar</h2><p>' . htmlspecialchars($r['error'] ?? 'parámetros inválidos') . '</p>';
+                return;
+            }
+            $data = [
+                'result'    => $r,
+                'title'     => $this->title($r),
+                'logoUrl'   => self::LOGO_URL,
+                'charts'    => !empty($_GET['charts']),          // default NO incluir gráficos
+                'orient'    => (($_GET['orientacion'] ?? 'portrait') === 'landscape') ? 'landscape' : 'portrait',
+                'paper'     => (($_GET['papel'] ?? 'letter') === 'a4') ? 'A4' : 'Letter',
+                'generated' => date('d/m/Y H:i'),
+                'mesEs'     => self::MES_ES,
+                'h'         => fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'),
+            ];
+            extract($data);
+            require APP_ROOT . '/app/views/reports/printable.php';
+        } catch (\Throwable $e) {
+            while (ob_get_level() > $obLevel) { ob_end_clean(); }
+            http_response_code(200);
+            header('Content-Type: text/html; charset=UTF-8');
+            echo '<!DOCTYPE html><html><head><meta charset="utf-8"></head><body style="font-family:Arial;padding:30px">'
+               . '<h2 style="color:#c0392b">Error al generar el reporte</h2><pre>' . htmlspecialchars($e->getMessage()) . '</pre></body></html>';
             return;
         }
-        $data = [
-            'result'    => $r,
-            'title'     => $this->title($r),
-            'logoUrl'   => self::LOGO_URL,
-            'charts'    => !empty($_GET['charts']),          // default NO incluir gráficos
-            'orient'    => (($_GET['orientacion'] ?? 'portrait') === 'landscape') ? 'landscape' : 'portrait',
-            'paper'     => (($_GET['papel'] ?? 'letter') === 'a4') ? 'A4' : 'Letter',
-            'generated' => date('d/m/Y H:i'),
-            'mesEs'     => self::MES_ES,
-            'h'         => fn($v) => htmlspecialchars((string)$v, ENT_QUOTES, 'UTF-8'),
-        ];
-        extract($data);
-        require APP_ROOT . '/app/views/reports/printable.php';
+
+        $html = ob_get_clean();
+
+        // Guardar copia estática autocontenida (sin sesión) y abrir esa URL.
+        // El print diferido queda a cargo del propio printable.php.
+        if (!empty($html) && strpos($html, '</html>') !== false) {
+            $key  = bin2hex(random_bytes(8));
+            $file = sys_get_temp_dir() . '/repdf-' . preg_replace('/[^a-f0-9]/', '', md5($key)) . '.html';
+            if (@file_put_contents($file, $html) !== false) {
+                $base = strtok((string)($_SERVER['REQUEST_URI'] ?? '/reports/export/pdf'), '?');
+                $url  = dirname($base) . '/pdf.html?' . http_build_query([
+                    '_p' => 1, '_k' => $key,
+                    'tab' => $_GET['tab'] ?? '', 'orientacion' => $_GET['orientacion'] ?? 'portrait',
+                ]);
+                $js = '<script>window.location.href=' . json_encode($url) . ';</script>';
+                if (($pos = strrpos($html, '</body>')) !== false) {
+                    $html = substr($html, 0, $pos) . $js . substr($html, $pos);
+                } else {
+                    $html .= $js;
+                }
+                // Limpieza básica de archivos viejos (> 1 día)
+                foreach (glob(sys_get_temp_dir() . '/repdf-*.html') ?: [] as $old) {
+                    if (filemtime($old) < time() - 86400) { @unlink($old); }
+                }
+            }
+        }
+
+        header('Content-Type: text/html; charset=UTF-8');
+        header('Content-Length: ' . strlen($html));
+        echo $html;
         exit;
     }
 }

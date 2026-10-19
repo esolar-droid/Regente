@@ -103,6 +103,9 @@ Router::get('/messages/create', 'App\Controllers\MessageController@index', ['App
 Router::get('/reports', 'App\Controllers\ReportController@index', ['App\Middleware\AuthMiddleware']);
 Router::get('/reports/export/csv', 'App\Controllers\ReportController@exportCsv', ['App\Middleware\AuthMiddleware']);
 Router::get('/reports/export/pdf', 'App\Controllers\ReportController@exportPdf', ['App\Middleware\AuthMiddleware']);
+// v16.1: página estática de impresión (sin sesión) — el propio controlador
+// valida el token _k antes de servir el HTML cacheado en sys_get_temp_dir().
+Router::get('/reports/export/pdf.html', 'App\Controllers\ReportController@exportPdf');
 
 // Error handlers
 Router::get('/403', function() {

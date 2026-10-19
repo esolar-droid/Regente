@@ -6,6 +6,47 @@
  */
 $kind = $result['kind'] ?? '';
 $z = fn($v) => \App\Controllers\ReportController::z($v);
+
+/**
+ * Rejilla reutilizable para "por días" / mensual / lapso.
+ * Definida ANTES de su uso (las definiciones de función dentro de bloques
+ * condicionales no se hoistean en PHP -> antes producía página en blanco).
+ */
+if (!function_exists('repGrid')) {
+function repGrid(array $roster, array $cols, array $grid, array $totals, callable $h, callable $z, bool $twoLineHeader): string {
+    ob_start(); ?>
+    <div style="overflow-x:auto">
+    <table class="grid">
+      <thead><tr><th class="name" style="text-align:left">#</th><th class="name" style="text-align:left">Estudiante</th>
+        <?php foreach ($cols as $col):
+            $iso = is_array($col) ? $col['f'] : $col;
+            $inh = is_array($col) && !empty($col['inh']);
+            $w = (int)date('N', strtotime($iso)); ?>
+          <th class="<?= $inh ? 'inh' : '' ?>">
+            <?php if ($twoLineHeader && is_array($col) && isset($col['m'])): ?><small><?= $h($col['m']) ?></small><br><?php endif; ?>
+            <?= $h(is_array($col) && isset($col['n']) ? $col['n'] : date('d', strtotime($iso))) ?><br>
+            <small><?= $h(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][$w - 1]) ?></small>
+          </th>
+        <?php endforeach; ?>
+        <th>P</th><th>A</th><th>L</th><th>F</th></tr></thead>
+      <tbody>
+        <?php foreach ($roster as $i => $s): $sid = (int)$s['id']; $t = $totals[$sid] ?? ['P'=>0,'A'=>0,'L'=>0,'F'=>0]; ?>
+          <tr><td class="name"><?= $i + 1 ?></td><td class="name"><?= $h($s['nombre_completo']) ?></td>
+            <?php foreach ($cols as $col):
+                $iso = is_array($col) ? $col['f'] : $col;
+                if (is_array($col) && !empty($col['inh'])) { echo '<td class="inh"></td>'; continue; }
+                $m = $grid[$sid][$iso] ?? null; $tt = $m['t'] ?? 'P'; ?>
+              <td class="mark-<?= $h($tt) ?>"><?= $h($tt) ?></td>
+            <?php endforeach; ?>
+            <td class="sumcell"><?= $h($z($t['P'])) ?></td><td class="sumcell"><?= $h($z($t['A'])) ?></td>
+            <td class="sumcell"><?= $h($z($t['L'])) ?></td><td class="sumcell"><?= $h($z($t['F'])) ?></td></tr>
+        <?php endforeach; ?>
+      </tbody>
+    </table>
+    </div>
+    <?php return ob_get_clean();
+}
+}
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -52,7 +93,7 @@ $z = fn($v) => \App\Controllers\ReportController::z($v);
   <div>
     <div class="doc-school">Colegio Marista · Sistema para Regentes</div>
     <div class="doc-title"><?= $h($title) ?></div>
-    <div class="doc-meta">Generado: <?= $h($generated) ?> · Gestión <?= h(date('Y')) ?> · Papel <?= $h($paper) ?> (<?= $orient === 'landscape' ? 'horizontal' : 'vertical' ?>)</div>
+    <div class="doc-meta">Generado: <?= $h($generated) ?> · Gestión <?= $h(date('Y')) ?> · Papel <?= $h($paper) ?> (<?= $orient === 'landscape' ? 'horizontal' : 'vertical' ?>)</div>
   </div>
 </div>
 
@@ -200,11 +241,13 @@ $z = fn($v) => \App\Controllers\ReportController::z($v);
 <div class="noprint-note">Se abrirá el diálogo de impresión — elige «Guardar como PDF», papel <?= $h($paper) ?>, márgenes «Predeterminados».</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.2.0/dist/chartjs-plugin-datalabels.min.js"></script>
 <script>
 /* dibuja REP_CHARTS en canvases dentro de #chartArea */
 (function () {
   const area = document.getElementById('chartArea');
   if (!area || !window.Chart || !window.REP_CHARTS) return;
+  if (window.ChartDataLabels) Chart.register(window.ChartDataLabels); // % en tortas
   window.REP_CHARTS.forEach(cfg => {
     const wrap = document.createElement('div');
     wrap.style.cssText = 'width:46%;min-width:250px;text-align:center';
@@ -215,52 +258,32 @@ $z = fn($v) => \App\Controllers\ReportController::z($v);
     wrap.appendChild(cap); wrap.appendChild(cv); area.appendChild(wrap);
     let ds;
     if (cfg.type === 'pie') ds = [{ data: cfg.data, backgroundColor: cfg.colors, borderWidth: 1 }];
-    else ds = cfg.series.map(s => ({ label: s.label, data: s.data,
+    else ds = (cfg.series || []).map(s => ({ label: s.label, data: s.data,
         backgroundColor: cfg.type === 'line' ? 'transparent' : s.color, borderColor: s.color, tension: .2 }));
-    new Chart(cv, { type: cfg.type === 'dual' ? 'bar' : cfg.type,
+    const isPie = cfg.type === 'pie';
+    new Chart(cv, { type: isPie ? 'doughnut' : cfg.type,
       data: { labels: cfg.labels, datasets: ds },
-      options: { plugins: { legend: { position: 'bottom' } },
-                 scales: cfg.type === 'pie' || cfg.type === 'radar' ? {} :
-                   { x: { stacked: !!cfg.stacked }, y: { stacked: !!cfg.stacked, beginAtZero: true } } } });
+      options: { plugins: {
+          title: { display: !!cfg.title, text: cfg.title || '', color: '#1B3A6B', font: { size: 13, weight: 'bold' } },
+          legend: { position: 'bottom' },
+          tooltip: { callbacks: { label: (c) => c.label + ': ' + c.parsed + (isPie ? ' (' + Math.round(c.parsed * 100 / (ds[0].data.reduce((a, b) => a + (+b || 0), 0) || 1)) + '%)' : '') } },
+          datalabels: { display: isPie, color: '#1a1a1a', font: { weight: 'bold', size: 12 },
+                        formatter: (v) => v > 0 ? Math.round(v * 100 / (ds[0].data.reduce((a, b) => a + (+b || 0), 0) || 1)) + '%' : '' }
+        },
+        scales: isPie || cfg.type === 'radar' ? {} :
+          { x: { stacked: !!cfg.stacked }, y: { stacked: !!cfg.stacked, beginAtZero: true } } } });
   });
 })();
-setTimeout(() => { window.print(); }, 700);
+setTimeout(function () {
+  var done = false;
+  function go() { if (done) return; done = true; try { window.print(); } catch (e) {} }
+  // El navegador congela los timers de pestañas en segundo plano: al activarse
+  // la pestaña (visibilitychange/focus) imprimimos de inmediato. Si ya estaba
+  // visible, el timer corto basta. Así la hoja SIEMPRE tiene contenido impreso.
+  document.addEventListener('visibilitychange', function () { if (!document.hidden) setTimeout(go, 150); });
+  window.addEventListener('focus', function () { setTimeout(go, 150); });
+  setTimeout(go, 1200);
+}, 0);
 </script>
 </body>
 </html>
-
-<?php
-/** Rejilla reutilizable para "por días" / mensual / lapso. */
-function repGrid(array $roster, array $cols, array $grid, array $totals, callable $h, callable $z, bool $twoLineHeader): string {
-    ob_start(); ?>
-    <div style="overflow-x:auto">
-    <table class="grid">
-      <thead><tr><th class="name" style="text-align:left">#</th><th class="name" style="text-align:left">Estudiante</th>
-        <?php foreach ($cols as $col):
-            $iso = is_array($col) ? $col['f'] : $col;
-            $inh = is_array($col) && !empty($col['inh']);
-            $w = (int)date('N', strtotime($iso)); ?>
-          <th class="<?= $inh ? 'inh' : '' ?>">
-            <?php if ($twoLineHeader && is_array($col) && isset($col['m'])): ?><small><?= $h($col['m']) ?></small><br><?php endif; ?>
-            <?= $h(is_array($col) && isset($col['n']) ? $col['n'] : date('d', strtotime($iso))) ?><br>
-            <small><?= $h(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][$w - 1]) ?></small>
-          </th>
-        <?php endforeach; ?>
-        <th>P</th><th>A</th><th>L</th><th>F</th></tr></thead>
-      <tbody>
-        <?php foreach ($roster as $i => $s): $sid = (int)$s['id']; $t = $totals[$sid] ?? ['P'=>0,'A'=>0,'L'=>0,'F'=>0]; ?>
-          <tr><td class="name"><?= $i + 1 ?></td><td class="name"><?= $h($s['nombre_completo']) ?></td>
-            <?php foreach ($cols as $col):
-                $iso = is_array($col) ? $col['f'] : $col;
-                if (is_array($col) && !empty($col['inh'])) { echo '<td class="inh"></td>'; continue; }
-                $m = $grid[$sid][$iso] ?? null; $tt = $m['t'] ?? 'P'; ?>
-              <td class="mark-<?= $h($tt) ?>"><?= $h($tt) ?></td>
-            <?php endforeach; ?>
-            <td class="sumcell"><?= $h($z($t['P'])) ?></td><td class="sumcell"><?= $h($z($t['A'])) ?></td>
-            <td class="sumcell"><?= $h($z($t['L'])) ?></td><td class="sumcell"><?= $h($z($t['F'])) ?></td></tr>
-        <?php endforeach; ?>
-      </tbody>
-    </table>
-    </div>
-    <?php return ob_get_clean();
-}

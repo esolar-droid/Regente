@@ -64,6 +64,7 @@ function repHeader($h, $title) { ?>
             <div class="control has-icons-left" style="position:relative">
               <input class="input" id="repStudentInput" placeholder="Escribe 2+ letras…"
                      autocomplete="off" data-suggest-url="/api/suggest?type=estudiante" data-suggest-target="#repStudentBox"
+                     data-suggest-select="#repStudentId"
                      value="<?= $h($res['student']['nombre'] ?? '') ?>">
               <span class="icon is-small is-left"><i class="fas fa-search"></i></span>
               <div class="suggest-box" id="repStudentBox" hidden></div>
@@ -499,59 +500,84 @@ function repHeader($h, $title) { ?>
 <script>
 /* Paleta institucional marista: azul profundo + acentos de marca PALF */
 const REP_C = { P:'#2ECC71', A:'#F39C12', L:'#3498DB', F:'#E74C3C', NAVY:'#1B3A6B' };
-function repPie(id, labels, data, colors) {
+function repPie(id, labels, data, colors, title) {
   const el = document.getElementById(id); if (!el || !window.Chart) return;
   new Chart(el, { type:'pie', data:{ labels, datasets:[{ data, backgroundColor:colors, borderWidth:1 }] },
-    options:{ plugins:{ legend:{ position:'bottom' } } } });
+    options:{ plugins:{ title: repTitle(title), legend:{ position:'bottom' } } } });
 }
-function repBars(id, labels, series, stacked=false) {
+function repBars(id, labels, series, stacked=false, title) {
   const el = document.getElementById(id); if (!el || !window.Chart) return;
   new Chart(el, { type:'bar', data:{ labels, datasets:series.map(s=>({ label:s.label, data:s.data, backgroundColor:s.color, stack: stacked?'a':undefined })) },
-    options:{ responsive:true, scales:{ x:{ stacked:stacked }, y:{ stacked:stacked, beginAtZero:true } }, plugins:{ legend:{ position:'bottom' } } } });
+    options:{ responsive:true, scales:{ x:{ stacked:stacked }, y:{ stacked:stacked, beginAtZero:true } }, plugins:{ title: repTitle(title), legend:{ position:'bottom' } } } });
 }
-function repLine(id, labels, series) {
+function repLine(id, labels, series, title) {
   const el = document.getElementById(id); if (!el || !window.Chart) return;
   new Chart(el, { type:'line', data:{ labels, datasets:series.map(s=>({ label:s.label, data:s.data, borderColor:s.color, tension:.2 })) },
-    options:{ plugins:{ legend:{ position:'bottom' } } } });
+    options:{ plugins:{ title: repTitle(title), legend:{ position:'bottom' } } } });
 }
+/* Título en todos los estadígrafos y % dentro de las tortas */
+const repTitle = (t) => ({ display: !!t, text: t || '', color: '#1B3A6B', font: { size: 14, weight: 'bold' } });
+if (window.Chart) Chart.register({
+  id: 'repPctLabels',
+  afterDatasetsDraw(chart) {
+    const type = (chart.config && chart.config.type) || '';
+    if (!['pie', 'doughnut'].includes(type)) return;
+    const ds = chart.data.datasets[0];
+    const total = (ds.data || []).reduce((a, b) => a + (+b || 0), 0);
+    if (!total) return;
+    const ctx = chart.ctx;
+    ctx.save();
+    ctx.font = 'bold 12px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    chart.getDatasetMeta(0).data.forEach((arc, i) => {
+      const v = +ds.data[i] || 0;
+      if (!v) return;
+      const p = arc.tooltipPosition();
+      ctx.fillStyle = '#1a1a1a';
+      ctx.fillText(Math.round(v * 100 / total) + '%', p.x, p.y);
+    });
+    ctx.restore();
+  }
+});
 document.addEventListener('DOMContentLoaded', () => {
   const I = window.REP_IND;
   if (I) {
-    repPie('chIndTorta', I.torta.labels, I.torta.data, [REP_C.P, REP_C.A]);
-    repBars('chIndHist', I.hist.meses, [{label:'Atrasos', data:I.hist.A, color:REP_C.A},{label:'Faltas', data:I.hist.F, color:REP_C.F}]);
+    repPie('chIndTorta', I.torta.labels, I.torta.data, [REP_C.P, REP_C.A], 'Presente vs Atrasos (%)');
+    repBars('chIndHist', I.hist.meses, [{label:'Atrasos', data:I.hist.A, color:REP_C.A},{label:'Faltas', data:I.hist.F, color:REP_C.F}], false, 'Atrasos y Faltas mensuales');
   }
   const D = window.REP_DIAS;
   if (D) {
-    repPie('chDTorta', D.torta.labels, D.torta.data, [REP_C.P, REP_C.A]);
+    repPie('chDTorta', D.torta.labels, D.torta.data, [REP_C.P, REP_C.A], 'Presente vs Atraso (%)');
     // barras P/A/L/F con color por barra
     const bEl = document.getElementById('chDBarras');
     if (bEl && window.Chart) new Chart(bEl, { type:'bar', data:{ labels:D.barras.labels,
       datasets:[{ label:'Eventos', data:D.barras.data, backgroundColor:[REP_C.P,REP_C.A,REP_C.L,REP_C.F] }] },
-      options:{ plugins:{ legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } });
+      options:{ plugins:{ title: repTitle('Totales P / A / L / F'), legend:{ display:false } }, scales:{ y:{ beginAtZero:true } } } });
     const tEl = document.getElementById('chDTelara');
     if (tEl && window.Chart) new Chart(tEl, { type:'radar', data:{ labels:D.telara.labels, datasets:[
         {label:'Atrasos',data:D.telara.A,borderColor:REP_C.A,backgroundColor:'rgba(243,156,18,.2)'},
         {label:'Licencias',data:D.telara.L,borderColor:REP_C.L,backgroundColor:'rgba(52,152,219,.2)'},
         {label:'Faltas',data:D.telara.F,borderColor:REP_C.F,backgroundColor:'rgba(231,76,60,.2)'}]},
-        options:{ plugins:{ legend:{ position:'bottom' } } } });
+        options:{ plugins:{ title: repTitle('Incidencia por estudiante (# lista)'), legend:{ position:'bottom' } } } });
     repLine('chDLineas', D.lineas.labels, [
         {label:'A acum.',data:D.lineas.A,color:REP_C.A},
         {label:'L acum.',data:D.lineas.L,color:REP_C.L},
-        {label:'F acum.',data:D.lineas.F,color:REP_C.F}]);
+        {label:'F acum.',data:D.lineas.F,color:REP_C.F}], 'Acumulado A / L / F');
   }
-  const mkDaily = (pre, S) => { if (!S) return;
-    repBars(pre+'Barras', S.labels, [{label:'A',data:S.A,color:REP_C.A},{label:'L',data:S.L,color:REP_C.L},{label:'F',data:S.F,color:REP_C.F}], true);
+  const mkDaily = (pre, S, t1, t2) => { if (!S) return;
+    repBars(pre+'Barras', S.labels, [{label:'A',data:S.A,color:REP_C.A},{label:'L',data:S.L,color:REP_C.L},{label:'F',data:S.F,color:REP_C.F}], true, t1);
     repLine(pre+'Lineas', S.labels, [
       {label:'A acum.',data:S.accA,color:REP_C.A},
       {label:'L acum.',data:S.accL,color:REP_C.L},
-      {label:'F acum.',data:S.accF,color:REP_C.F}]);
+      {label:'F acum.',data:S.accF,color:REP_C.F}], t2);
   };
-  mkDaily('chM', window.REP_MES);
-  mkDaily('chL', window.REP_LAPSO);
+  mkDaily('chM', window.REP_MES, 'Eventos diarios A/L/F del mes', 'Acumulado mensual A/L/F');
+  mkDaily('chL', window.REP_LAPSO, 'Eventos diarios A/L/F del lapso', 'Acumulado del lapso A/L/F');
   const A = window.REP_ANUAL;
   if (A) {
-    repBars('chABarras', A.labels, [{label:'A',data:A.A,color:REP_C.A},{label:'L',data:A.L,color:REP_C.L},{label:'F',data:A.F,color:REP_C.F}]);
-    repPie('chATorta', A.torta.labels, A.torta.data, [REP_C.A, REP_C.L, REP_C.F]);
+    repBars('chABarras', A.labels, [{label:'A',data:A.A,color:REP_C.A},{label:'L',data:A.L,color:REP_C.L},{label:'F',data:A.F,color:REP_C.F}], false, 'A/L/F mensuales del curso');
+    repPie('chATorta', A.torta.labels, A.torta.data, [REP_C.A, REP_C.L, REP_C.F], 'Distribución ALF de la gestión (%)');
   }
 
   /* Diálogo de opciones PDF -> abre ventana de impresión */
