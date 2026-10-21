@@ -60,6 +60,12 @@
                         </a>
                     <?php endif; ?>
 
+                    <?php if (can('view_bitacora') || isRegente()): ?>
+                        <a class="navbar-item has-text-white" href="/bitacora">
+                            <i class="fas fa-chalkboard-teacher"></i>&nbsp; Bitácora
+                        </a>
+                    <?php endif; ?>
+
                     <?php if (isAdmin()): ?>
                         <a class="navbar-item has-text-white" href="/admin">
                             <i class="fas fa-shield-alt"></i>&nbsp; Administración

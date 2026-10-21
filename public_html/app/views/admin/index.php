@@ -537,16 +537,111 @@ S3B,Maria Lopez,Miercoles,10:00,11:30,Fisica-Quimica,<?= (int)$anioSel ?>"></tex
     <?php endif; ?>
 
     <!-- =========================================================
-         PESTAÑA 4 — DIAGNÓSTICO
+         PESTAÑA 4 — DIAGNÓSTICO (v17: páginas + errores + archivos)
          ========================================================= -->
-    <?php if ($curTab === 'diagnostico' && !empty($diag)): ?>
+    <?php if ($curTab === 'diagnostico'): ?>
     <?php $badge = ['ok' => 'is-success', 'warn' => 'is-warning', 'bad' => 'is-danger', 'info' => 'is-light']; ?>
+    <?php
+      // Normalizar: si el servidor aún corre un AdminController viejo (sin las
+      // secciones nuevas), no dejar tablas vacías silenciosas — avisar con claridad.
+      $diagPages  = $diag['pages']     ?? [];
+      $diagErrors = $diag['errors']    ?? [];
+      $diagFiles  = $diag['files']     ?? [];
+      $diagSec    = isset($diag['security'][0]) && is_array($diag['security'][0] ?? null) ? $diag['security'] : [];
+      $diagInteg  = $diag['integrity'] ?? [];
+      $diagChecks = $diag['checks']    ?? [];
+      $diagEnv    = $diag['env']       ?? [];
+      $diagTables = $diag['tables']    ?? [];
+    ?>
+
+    <?php
+      // Resumen global de salud
+      $statesAll = array_column($diagEnv, 2);
+      foreach ($diagSec as $s) $statesAll[] = $s[2] ?? null;
+      foreach ($diagInteg as $i) $statesAll[] = $i[2] ?? null;
+      foreach ($diagPages as $p) $statesAll[] = $p['state'];
+      foreach ($diagErrors as $er) $statesAll[] = $er['state'];
+      foreach ($diagFiles as $fl) $statesAll[] = $fl['state'];
+      $nBad = count(array_keys($statesAll, 'bad'));
+      $nWarn = count(array_keys($statesAll, 'warn'));
+    ?>
+    <div class="notification <?= $nBad ? 'is-danger' : ($nWarn ? 'is-warning' : 'is-success') ?>">
+      <p class="title is-5 mb-1">
+        <i class="fas fa-<?= $nBad ? 'triangle-exclamation' : ($nWarn ? 'circle-exclamation' : 'circle-check') ?>"></i>&nbsp;
+        Resumen del sistema:
+        <?= $nBad ? "<strong>$nBad problema(s) crítico(s)</strong> detectado(s)" : ($nWarn ? "$nWarn advertencia(s), sin errores críticos" : 'todo en orden') ?>
+      </p>
+      <p class="is-size-7 has-text-grey">Verificado el <?= date('d/m/Y H:i:s') ?> · PHP <?= PHP_VERSION ?></p>
+    </div>
+
+    <div class="columns">
+      <div class="column is-6">
+        <div class="box">
+          <p class="title is-5"><i class="fas fa-file-lines"></i>&nbsp; Páginas y rutas <span class="tag is-light"><?= count($diagPages) ?></span></p>
+          <p class="subtitle is-7 has-text-grey">Vistas, registro de rutas y prueba HTTP real de cada página (incluye Bitácora y Dashboard v17)</p>
+          <table class="table is-narrow is-fullwidth is-size-7">
+            <thead><tr><th>Ruta</th><th>Verificación</th><th>Estado</th></tr></thead>
+            <tbody>
+            <?php if (!$diagPages): ?>
+              <tr><td colspan="3" class="has-text-grey">Sin verificaciones — sube el <code>AdminController.php</code> actualizado a esta pestaña.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($diagPages as $p): ?>
+              <tr>
+                <td><code><?= $h($p['page']) ?></code></td>
+                <td><?= $h($p['what']) ?> <em class="has-text-grey">— <?= $h($p['detail']) ?></em></td>
+                <td><span class="tag <?= $badge[$p['state']] ?? 'is-light' ?>"><?= strtoupper($h($p['state'])) ?></span></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      <div class="column is-6">
+        <div class="box">
+          <p class="title is-5"><i class="fas fa-bug"></i>&nbsp; Errores registrados</p>
+          <p class="subtitle is-7 has-text-grey">Últimas entradas de logs/error.log (los "Error interno del servidor" quedan aquí)</p>
+          <table class="table is-narrow is-fullwidth is-size-7">
+            <tbody>
+            <?php if (!$diagErrors): ?>
+              <tr><td colspan="2" class="has-text-grey">Sin datos de log — sube el <code>AdminController.php</code> actualizado.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($diagErrors as $er): ?>
+              <tr>
+                <td style="width:1%"><span class="tag <?= $badge[$er['state']] ?? 'is-light' ?>"><?= $h($er['file']) ?></span></td>
+                <td class="mono" style="word-break:break-all"><?= $h($er['line']) ?></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+        <div class="box">
+          <p class="title is-5"><i class="fas fa-folder-tree"></i>&nbsp; Archivos y directorios críticos <span class="tag is-light"><?= count($diagFiles) ?></span></p>
+          <table class="table is-narrow is-fullwidth is-size-7">
+            <thead><tr><th>Archivo</th><th>Descripción</th><th>Estado</th></tr></thead>
+            <tbody>
+            <?php if (!$diagFiles): ?>
+              <tr><td colspan="3" class="has-text-grey">Sin verificaciones — sube el <code>AdminController.php</code> actualizado.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($diagFiles as $fl): ?>
+              <tr>
+                <td><code><?= $h($fl['item']) ?></code></td>
+                <td><?= $h($fl['desc']) ?> <em class="has-text-grey">(<?= $h($fl['detail']) ?>)</em></td>
+                <td><span class="tag <?= $badge[$fl['state']] ?? 'is-light' ?>"><?= strtoupper($h($fl['state'])) ?></span></td>
+              </tr>
+            <?php endforeach; ?>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
     <div class="columns">
       <div class="column is-6">
         <div class="box">
           <p class="title is-5"><i class="fas fa-server"></i>&nbsp; Entorno</p>
           <table class="table is-narrow is-fullwidth is-size-7">
-            <?php foreach ($diag['env'] as $e): ?>
+            <?php if (!$diagEnv): ?><tr><td class="has-text-grey">Sin datos (el diagnóstico de entorno falló).</td></tr><?php endif; ?>
+            <?php foreach ($diagEnv as $e): ?>
               <tr><td><?= $h($e[0]) ?></td><td><span class="tag <?= $badge[$e[2]] ?? 'is-light' ?>"><?= $h($e[1]) ?></span></td></tr>
             <?php endforeach; ?>
           </table>
@@ -554,7 +649,8 @@ S3B,Maria Lopez,Miercoles,10:00,11:30,Fisica-Quimica,<?= (int)$anioSel ?>"></tex
         <div class="box">
           <p class="title is-5"><i class="fas fa-database"></i>&nbsp; Tablas y filas</p>
           <table class="table is-narrow is-fullwidth is-size-7">
-            <?php foreach ($diag['tables'] as $t): ?>
+            <?php if (!$diagTables): ?><tr><td class="has-text-grey">Sin datos (fallo de conexión al diagnosticar tablas).</td></tr><?php endif; ?>
+            <?php foreach ($diagTables as $t): ?>
               <tr><td><code><?= $h($t['tabla']) ?></code></td>
                   <td class="has-text-right"><?= $t['filas'] === 'NO EXISTE' ? '<span class="tag is-danger">NO EXISTE</span>' : number_format((int)$t['filas']) ?></td></tr>
             <?php endforeach; ?>
@@ -565,7 +661,10 @@ S3B,Maria Lopez,Miercoles,10:00,11:30,Fisica-Quimica,<?= (int)$anioSel ?>"></tex
         <div class="box">
           <p class="title is-5"><i class="fas fa-lock"></i>&nbsp; Seguridad</p>
           <table class="table is-narrow is-fullwidth is-size-7">
-            <?php foreach ($diag['security'] as $s): ?>
+            <?php if (!$diagSec): ?>
+              <tr><td class="has-text-grey">Sin verificaciones — el bloque de seguridad falló o falta el <code>AdminController.php</code> actualizado.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($diagSec as $s): ?>
               <tr><td><?= $h($s[0]) ?></td><td><span class="tag <?= $badge[$s[2]] ?? 'is-light' ?>"><?= $h($s[1]) ?></span></td></tr>
             <?php endforeach; ?>
           </table>
@@ -573,12 +672,18 @@ S3B,Maria Lopez,Miercoles,10:00,11:30,Fisica-Quimica,<?= (int)$anioSel ?>"></tex
         <div class="box">
           <p class="title is-5"><i class="fas fa-heart-pulse"></i>&nbsp; Integridad de datos</p>
           <table class="table is-narrow is-fullwidth is-size-7">
-            <?php foreach ($diag['integrity'] as $i): ?>
+            <?php if (!$diagInteg): ?>
+              <tr><td class="has-text-grey">Sin verificaciones — el bloque de integridad falló o falta el <code>AdminController.php</code> actualizado.</td></tr>
+            <?php endif; ?>
+            <?php foreach ($diagInteg as $i): ?>
               <tr><td><?= $h($i[0]) ?></td><td><span class="tag <?= $badge[$i[2]] ?? 'is-light' ?>"><?= $h($i[1]) ?></span></td></tr>
             <?php endforeach; ?>
           </table>
           <p class="title is-6 mt-3">Checklist post-migración</p>
-          <?php foreach ($diag['checks'] as $c): ?>
+          <?php if (!$diagChecks): ?>
+            <p class="is-size-7 has-text-grey">Sin checklist disponible.</p>
+          <?php endif; ?>
+          <?php foreach ($diagChecks as $c): ?>
             <p class="is-size-7">
               <span class="tag <?= $c[1] ? 'is-success' : 'is-danger' ?>"><?= $c[1] ? 'OK' : 'REVISAR' ?></span>
               <?= $h($c[0]) ?> <em class="has-text-grey">(<?= $h($c[2]) ?>)</em>

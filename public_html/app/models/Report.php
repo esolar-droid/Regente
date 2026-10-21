@@ -347,4 +347,81 @@ class Report {
         }
         return $out;
     }
+
+    // ====================================================================
+    // v17 — DASHBOARD: agregaciones para gráficos y rankings
+    // ====================================================================
+
+    /**
+     * Totales acumulados de A/L/F por curso desde el inicio de la gestión
+     * hasta hoy. Una sola consulta con GROUP BY (memoria O(cursos)).
+     * Devuelve [id_curso] => ['A'=>n,'L'=>n,'F'=>n].
+     */
+    public static function courseEventTotals(?int $managementId = null) {
+        try {
+            $db = \Database::getConnection();
+            $where = "WHERE ev.fecha_evento <= CURDATE()";
+            $params = [];
+            if ($managementId !== null) {
+                $where .= " AND s.id_gestion = ?";
+                $params[] = $managementId;
+            }
+            $stmt = $db->prepare(
+                "SELECT s.id_curso AS cid, ev.tipo_evento AS tipo, COUNT(*) AS n
+                 FROM eventos ev
+                 JOIN estudiantes s ON s.id = ev.id_estudiante
+                 $where
+                 GROUP BY s.id_curso, ev.tipo_evento"
+            );
+            $stmt->execute($params);
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $short = Event::typeToShort($r['tipo']);
+                if ($short === '' || $short === 'P') continue;
+                $cid = (int)$r['cid'];
+                if (!isset($out[$cid])) $out[$cid] = ['A' => 0, 'L' => 0, 'F' => 0];
+                $out[$cid][$short] += (int)$r['n'];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            error_log('Report.courseEventTotals: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Ranking de estudiantes por cantidad de eventos de un tipo, agrupado
+     * por nivel educativo ('Primaria' | 'Secundaria').
+     * @param string $type 'atraso'|'licencia'|'falta'
+     * @return array [['nombre'=>..., 'curso'=>'P1A', 'n'=>int], ...] top N
+     */
+    public static function studentRankingByLevel(string $type, string $nivel, int $limit = 20, ?int $managementId = null) {
+        // 'falta' incluye restos legados 'ausencia' (mismo criterio que getStatistics)
+        $types = $type === 'falta' ? ['falta', 'ausencia'] : [$type];
+        try {
+            $db = \Database::getConnection();
+            $ph = implode(',', array_fill(0, count($types), '?'));
+            $sql = "SELECT st.nombre_completo AS nombre, c.curso AS curso, COUNT(*) AS n
+                    FROM eventos ev
+                    JOIN estudiantes st ON st.id = ev.id_estudiante
+                    JOIN cursos c ON c.id = st.id_curso
+                    WHERE c.nivel = ? AND ev.tipo_evento IN ($ph) AND ev.fecha_evento <= CURDATE()";
+            $params = array_merge([$nivel], $types);
+            if ($managementId !== null) {
+                $sql .= " AND st.id_gestion = ?";
+                $params[] = $managementId;
+            }
+            $sql .= " GROUP BY st.id, st.nombre_completo, c.curso ORDER BY n DESC, st.nombre_completo ASC LIMIT " . (int)$limit;
+            $stmt = $db->prepare($sql);
+            $stmt->execute($params);
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $out[] = ['nombre' => $r['nombre'], 'curso' => $r['curso'], 'n' => (int)$r['n']];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            error_log('Report.studentRankingByLevel: ' . $e->getMessage());
+            return [];
+        }
+    }
 }

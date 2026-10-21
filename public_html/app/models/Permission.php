@@ -85,6 +85,12 @@ class Permission extends Model {
                 // Management
                 ['name' => 'view_management', 'description' => 'Ver gestión'],
                 ['name' => 'change_management', 'description' => 'Cambiar gestión'],
+
+                // Bitácora del profesorado (v17) — rol destinatario: regente
+                ['name' => 'view_bitacora', 'description' => 'Ver Bitácora del profesorado'],
+                ['name' => 'create_bitacora', 'description' => 'Crear registros de Bitácora'],
+                ['name' => 'edit_bitacora', 'description' => 'Editar registros de Bitácora'],
+                ['name' => 'delete_bitacora', 'description' => 'Eliminar registros de Bitácora'],
             ];
             
             foreach ($permissions as $permission) {
@@ -103,7 +109,8 @@ class Permission extends Model {
                 'view_dashboard', 'view_students', 'create_student', 'edit_student', 'delete_student',
                 'view_courses', 'view_events', 'create_event', 'edit_event', 'delete_event',
                 'view_messages', 'create_message', 'send_whatsapp', 'view_reports',
-                'export_csv', 'export_pdf', 'view_management', 'change_management'
+                'export_csv', 'export_pdf', 'view_management', 'change_management',
+                'view_bitacora', 'create_bitacora', 'edit_bitacora', 'delete_bitacora'
             ];
             foreach ($regentePermissions as $permName) {
                 $permId = $db->query("SELECT id FROM permisos WHERE name = '$permName'")->fetchColumn();

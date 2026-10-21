@@ -88,6 +88,15 @@ Router::post('/events/{id}/delete', 'App\Controllers\EventController@destroy', [
 Router::get('/attendance', 'App\Controllers\EventController@attendance', ['App\Middleware\AuthMiddleware']);
 Router::post('/attendance/save', 'App\Controllers\EventController@saveAttendance', ['App\Middleware\AuthMiddleware']);
 
+// v17: Bitacora del profesorado (acceso: admin o regente; el controlador valida)
+Router::get('/bitacora', 'App\Controllers\BitacoraController@index', ['App\Middleware\AuthMiddleware']);
+Router::post('/bitacora/store', 'App\Controllers\BitacoraController@store', ['App\Middleware\AuthMiddleware']);
+Router::post('/bitacora/{id}/update', 'App\Controllers\BitacoraController@update', ['App\Middleware\AuthMiddleware']);
+Router::post('/bitacora/{id}/delete', 'App\Controllers\BitacoraController@destroy', ['App\Middleware\AuthMiddleware']);
+Router::get('/bitacora/export/pdf', 'App\Controllers\BitacoraController@exportPdf', ['App\Middleware\AuthMiddleware']);
+// Hoja de impresion cacheada (sin sesion): el controlador valida el token _k.
+Router::get('/bitacora/export/pdf.html', 'App\Controllers\BitacoraController@exportPdf');
+
 // Management (gestión escolar) -> pestaña 3 de Administración
 Router::get('/management', function () { header('Location: /admin?tab=gestion'); });
 Router::post('/management/switch', function () { header('Location: /admin?tab=gestion'); exit; });

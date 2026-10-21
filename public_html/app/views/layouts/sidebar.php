@@ -35,6 +35,11 @@ if (isAuthenticated()) {
         $items[] = ['route' => '/search', 'label' => 'Buscar', 'icon' => 'fas fa-search'];
     }
 
+    // v17: «Bitácora» del profesorado (regente; admin puede por ser admin)
+    if (can('view_bitacora') || isRegente()) {
+        $items[] = ['route' => '/bitacora', 'label' => 'Bitácora', 'icon' => 'fas fa-chalkboard-teacher'];
+    }
+
     // Panel exclusivo del administrador
     if (isAdmin()) {
         $items[] = ['route' => '/admin', 'label' => 'Administración', 'icon' => 'fas fa-shield-alt'];

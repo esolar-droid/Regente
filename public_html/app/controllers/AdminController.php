@@ -708,77 +708,364 @@ class AdminController extends Controller {
     }
 
     // ============================================================
-    // PESTAÑA 4 — Diagnóstico (incluye seguridad)
+    // PESTAÑA 4 — Diagnóstico (seguridad + páginas + errores)
     // ============================================================
     private function runDiagnostics() {
-        $out = ['env' => [], 'tables' => [], 'integrity' => [], 'security' => [], 'checks' => []];
-        try {
+        $out = ['env' => [], 'tables' => [], 'integrity' => [], 'security' => [], 'checks' => [], 'pages' => [], 'errors' => [], 'files' => []];
+
+        // Cada bloque se ejecuta AISLADO: si uno falla, los demás se muestran igual
+        // y el fallo queda registrado como fila BAD dentro de su propia sección
+        // (antes un solo error abortaba todo y dejaba secciones vacías).
+        $section = function (string $key, callable $fn) use (&$out) {
+            try { $out[$key] = $fn(); }
+            catch (\Throwable $e) {
+                $msg = $e->getMessage() . ' (' . basename($e->getFile()) . ':' . $e->getLine() . ')';
+                if ($key === 'integrity' || $key === 'security') {
+                    $out[$key][] = ['Error de diagnóstico', $msg, 'bad'];
+                } elseif ($key === 'pages' || $key === 'files') {
+                    $out[$key][] = ['page' => '—', 'what' => 'Error de diagnóstico', 'state' => 'bad', 'detail' => $msg];
+                } elseif ($key === 'errors') {
+                    $out[$key][] = ['file' => 'diagnóstico', 'state' => 'bad', 'line' => $msg];
+                } else {
+                    $out['integrity'][] = ['Error de diagnóstico (' . $key . ')', $msg, 'bad'];
+                }
+            }
+        };
+
+        // --- Páginas / rutas del sistema (independiente de la BD)
+        $section('pages',   fn() => $this->diagnosePages());
+        // --- Errores registrados en el log (independiente de la BD)
+        $section('errors',  fn() => $this->diagnoseErrorLog());
+        // --- Archivos y directorios críticos (independiente de la BD)
+        $section('files',   fn() => $this->diagnoseFiles());
+
+        // --- Entorno + base de datos (requiere conexión)
+        $section('env', function () {
             $db = \Database::getConnection();
-            $q = fn($sql, $params = []) => (function () use ($db, $sql, $params) {
-                $s = $db->prepare($sql); $s->execute($params); return $s->fetchAll(\PDO::FETCH_ASSOC);
-            })();
+            $rows = [];
+            $rows[] = ['PHP', PHP_VERSION, version_compare(PHP_VERSION, '7.4.0', '>=') ? 'ok' : 'warn'];
+            $rows[] = ['MySQL', $db->getAttribute(\PDO::ATTR_SERVER_VERSION), 'ok'];
+            $rows[] = ['Zona horaria', date_default_timezone_get(), in_array(date_default_timezone_get(), ['America/La_Paz','America/Lima','America/Bogota']) ? 'ok' : 'warn'];
+            $rows[] = ['gd_compress', function_exists('gzencode') ? 'disponible' : 'NO disponible', function_exists('gzencode') ? 'ok' : 'warn'];
+            $rows[] = ['upload_max_filesize', ini_get('upload_max_filesize'), 'info'];
+            $rows[] = ['post_max_size', ini_get('post_max_size'), 'info'];
+            return $rows;
+        });
 
-            // --- Entorno
-            $out['env'][] = ['PHP', PHP_VERSION, version_compare(PHP_VERSION, '7.4.0', '>=') ? 'ok' : 'warn'];
-            $out['env'][] = ['MySQL', $db->getAttribute(\PDO::ATTR_SERVER_VERSION), 'ok'];
-            $out['env'][] = ['Zona horaria', date_default_timezone_get(), in_array(date_default_timezone_get(), ['America/La_Paz','America/Lima','America/Bogota']) ? 'ok' : 'warn'];
-            $out['env'][] = ['gd_compress', function_exists('gzencode') ? 'disponible' : 'NO disponible', function_exists('gzencode') ? 'ok' : 'warn'];
-            $out['env'][] = ['upload_max_filesize', ini_get('upload_max_filesize'), 'info'];
-            $out['env'][] = ['post_max_size', ini_get('post_max_size'), 'info'];
+        $q = function (string $sql, array $params = []) {
+            $db = \Database::getConnection();
+            $s = $db->prepare($sql);
+            $s->execute($params);
+            return $s->fetchAll(\PDO::FETCH_ASSOC);
+        };
 
-            // --- Tablas y conteos
+        // --- Tablas y conteos
+        $section('tables', function () use ($q) {
             $wanted = ['usuarios','roles','permisos','role_permissions','cursos','estudiantes',
                        'eventos','mensajes_enviados','feriados','horarios','gestion',
-                       'estudiante_estados','snapshots','admin_log'];
+                       'estudiante_estados','snapshots','admin_log','bitacora'];
+            $rows = [];
             foreach ($wanted as $t) {
-                $cnt = $q("SELECT COUNT(*) c FROM `$t`")[0]['c'] ?? null;
-                $out['tables'][] = ['tabla' => $t, 'filas' => $cnt === null ? 'NO EXISTE' : (int)$cnt];
+                try {
+                    $cnt = $q("SELECT COUNT(*) c FROM `$t`")[0]['c'] ?? null;
+                    $rows[] = ['tabla' => $t, 'filas' => $cnt === null ? 'NO EXISTE' : (int)$cnt];
+                } catch (\Throwable $e) {
+                    $rows[] = ['tabla' => $t, 'filas' => 'NO EXISTE'];
+                }
             }
+            return $rows;
+        });
 
-            // --- Integridad referencial (huérfanos y duplicados)
-            $orph = $q("SELECT COUNT(*) c FROM eventos e LEFT JOIN estudiantes s ON s.id=e.id_estudiante WHERE s.id IS NULL")[0]['c'] ?? 0;
-            $out['integrity'][] = ['Eventos sin estudiante', (int)$orph, $orph ? 'bad' : 'ok'];
-            $orph2 = $q("SELECT COUNT(*) c FROM horarios h LEFT JOIN cursos c ON c.id=h.id_curso WHERE c.id IS NULL")[0]['c'] ?? 0;
-            $out['integrity'][] = ['Horarios sin curso', (int)$orph2, $orph2 ? 'bad' : 'ok'];
-            $orph3 = $q("SELECT COUNT(*) c FROM horarios h LEFT JOIN usuarios u ON u.id=h.id_profesor WHERE h.id_profesor IS NOT NULL AND u.id IS NULL")[0]['c'] ?? 0;
-            $out['integrity'][] = ['Horarios con profesor inexistente', (int)$orph3, $orph3 ? 'bad' : 'ok'];
-            $dup = $q("SELECT COUNT(*) c FROM (SELECT id_estudiante, fecha_evento FROM eventos GROUP BY id_estudiante, fecha_evento HAVING COUNT(*)>1) t")[0]['c'] ?? 0;
-            $out['integrity'][] = ['Duplicados A/L/F mismo día', (int)$dup, $dup ? 'bad' : 'ok'];
-            $nogestion = $q("SELECT COUNT(*) c FROM estudiantes s LEFT JOIN gestion g ON g.id=s.id_gestion WHERE g.id IS NULL")[0]['c'] ?? 0;
-            $out['integrity'][] = ['Estudiantes sin gestión', (int)$nogestion, $nogestion ? 'bad' : 'ok'];
+        // --- Integridad referencial (huérfanos y duplicados)
+        $section('integrity', function () use ($q) {
+            $rows = [];
+            $check = function ($label, $sql, $params = []) use ($q, &$rows) {
+                try {
+                    $n = (int)($q($sql, $params)[0]['c'] ?? 0);
+                    $rows[] = [$label, $n, $n ? 'bad' : 'ok'];
+                } catch (\Throwable $e) {
+                    $rows[] = [$label, 'consulta falló: ' . $e->getMessage(), 'bad'];
+                }
+            };
+            $check('Eventos sin estudiante',
+                "SELECT COUNT(*) c FROM eventos e LEFT JOIN estudiantes s ON s.id=e.id_estudiante WHERE s.id IS NULL");
+            $check('Horarios sin curso',
+                "SELECT COUNT(*) c FROM horarios h LEFT JOIN cursos c ON c.id=h.id_curso WHERE c.id IS NULL");
+            $check('Horarios con profesor inexistente',
+                "SELECT COUNT(*) c FROM horarios h LEFT JOIN usuarios u ON u.id=h.id_profesor WHERE h.id_profesor IS NOT NULL AND u.id IS NULL");
+            $check('Duplicados A/L/F mismo día',
+                "SELECT COUNT(*) c FROM (SELECT id_estudiante, fecha_evento FROM eventos GROUP BY id_estudiante, fecha_evento HAVING COUNT(*)>1) t");
+            $check('Estudiantes sin gestión',
+                "SELECT COUNT(*) c FROM estudiantes s LEFT JOIN gestion g ON g.id=s.id_gestion WHERE g.id IS NULL");
+            return $rows;
+        });
 
-            // --- Checklist post-migración
-            $activa = Management::firstWhere('estado', '=', 'activa');
+        // --- Checklist post-migración
+        $section('checks', function () use ($q) {
+            $rows = [];
+            // \App\Models\: este controller vive en namespace App\Controllers y Management
+            // no está importado; sin el prefijo completo PHP lo busca en App\Controllers\
+            $activa = \App\Models\Management::firstWhere('estado', '=', 'activa');
             if ($activa) {
                 $sinCurso = $q("SELECT COUNT(*) c FROM estudiantes WHERE id_gestion=? AND (id_curso IS NULL OR id_curso=0)", [(int)$activa->id])[0]['c'] ?? 0;
-                $out['checks'][] = ['¿Todos los alumnos de la gestión ' . $activa->anio . ' tienen curso?', !$sinCurso, "$sinCurso sin curso"];
+                $rows[] = ['¿Todos los alumnos de la gestión ' . $activa->anio . ' tienen curso?', !$sinCurso, "$sinCurso sin curso"];
                 $hoy = $q("SELECT COUNT(*) c FROM horarios WHERE anio=?", [(int)$activa->anio])[0]['c'] ?? 0;
-                $out['checks'][] = ['¿Horarios cargados para ' . $activa->anio . '?', $hoy > 0, "$hoy franjas"];
+                $rows[] = ['¿Horarios cargados para ' . $activa->anio . '?', $hoy > 0, "$hoy franjas"];
             } else {
-                $out['checks'][] = ['¿Existe una gestión activa?', false, 'ninguna'];
+                $rows[] = ['¿Existe una gestión activa?', false, 'ninguna'];
             }
+            return $rows;
+        });
 
-            // --- Seguridad
+        // --- Seguridad
+        $section('security', function () use ($q) {
+            $rows = [];
             $plain = 0;
-            foreach (User::query("SELECT contrasena FROM usuarios") as $u) {
+            foreach (\App\Models\User::query("SELECT contrasena FROM usuarios") as $u) {
                 $c = (string)$u->contrasena;
                 if ($c !== '' && !preg_match('/^\$2y\$|\$2b\$|\$argon2/', $c)) $plain++;
             }
-            $out['security'][] = ['Contraseñas en texto plano', $plain ? "$plain cuenta(s)" : '0 (todas con hash)', $plain ? 'bad' : 'ok'];
-            $out['security'][] = ['CSRF habilitado', defined('CSRF_TOKEN_NAME') ? 'sí' : 'no', defined('CSRF_TOKEN_NAME') ? 'ok' : 'bad'];
+            $rows[] = ['Contraseñas en texto plano', $plain ? "$plain cuenta(s)" : '0 (todas con hash)', $plain ? 'bad' : 'ok'];
+            $rows[] = ['CSRF habilitado', defined('CSRF_TOKEN_NAME') ? 'sí' : 'no', defined('CSRF_TOKEN_NAME') ? 'ok' : 'bad'];
             $https = (($_SERVER['HTTPS'] ?? '') !== '' || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https');
-            $out['security'][] = ['Conexión HTTPS', $https ? 'activa' : 'NO detectada', $https ? 'ok' : 'warn'];
+            $rows[] = ['Conexión HTTPS', $https ? 'activa' : 'NO detectada', $https ? 'ok' : 'warn'];
             $sidGen = session_id() ? 'sesión iniciada' : 'sin sesión';
-            $out['security'][] = ['Gestión de sesiones', $sidGen, 'ok'];
+            $rows[] = ['Gestión de sesiones', $sidGen, 'ok'];
             $cookieSecure = ini_get('session.cookie_httponly') ? 'HttpOnly sí' : 'HttpOnly NO';
-            $out['security'][] = ['Cookies de sesión', $cookieSecure, ini_get('session.cookie_httponly') ? 'ok' : 'warn'];
+            $rows[] = ['Cookies de sesión', $cookieSecure, ini_get('session.cookie_httponly') ? 'ok' : 'warn'];
             $adminCount = $q("SELECT COUNT(*) c FROM usuarios u JOIN roles r ON r.id=u.role_id WHERE r.name='administrador'")[0]['c'] ?? 0;
-            $out['security'][] = ['Cuentas administrador', (int)$adminCount, $adminCount > 2 ? 'warn' : 'ok'];
+            $rows[] = ['Cuentas administrador', (int)$adminCount, $adminCount > 2 ? 'warn' : 'ok'];
             $orphanPerms = $q("SELECT COUNT(*) c FROM permisos p LEFT JOIN role_permissions rp ON rp.permission_id=p.id WHERE rp.permission_id IS NULL")[0]['c'] ?? 0;
-            $out['security'][] = ['Permisos sin asignar a ningún rol', (int)$orphanPerms, $orphanPerms ? 'warn' : 'ok'];
-        } catch (\Throwable $e) {
-            $out['integrity'][] = ['Error de diagnóstico', $e->getMessage(), 'bad'];
+            $rows[] = ['Permisos sin asignar a ningún rol', (int)$orphanPerms, $orphanPerms ? 'warn' : 'ok'];
+            return $rows;
+        });
+
+        return $out;
+    }
+
+    /**
+     * Inventario de páginas/rutas: verifica que cada ruta GET registrada tenga
+     * su controlador+acción (o closure) y sus vistas asociadas existentes,
+     * y prueba el estado HTTP real de cada página vía loopback interno.
+     */
+    private function diagnosePages() {
+        $rows = [];
+
+        // Mapa de páginas principales con sus vistas esperadas
+        $expected = [
+            '/'          => ['label' => 'Splash / portada',           'view' => 'auth/splash.php'],
+            '/login'     => ['label' => 'Inicio de sesión',           'view' => 'auth/login.php'],
+            '/dashboard' => ['label' => 'Dashboard principal',        'view' => 'dashboard/index.php'],
+            '/students'  => ['label' => 'Estudiantes',                'view' => 'students/index.php'],
+            '/courses'   => ['label' => 'Cursos',                     'view' => 'courses/index.php'],
+            '/events'    => ['label' => 'Eventos',                    'view' => 'events/index.php'],
+            '/attendance'=> ['label' => 'Registrar asistencia',       'view' => 'attendance/index.php'],
+            '/search'    => ['label' => 'Búsqueda',                   'view' => 'search/index.php'],
+            '/messages'  => ['label' => 'Mensajería',                 'view' => 'messages/index.php'],
+            '/reports'   => ['label' => 'Reportes',                   'view' => 'reports/index.php'],
+            '/bitacora'  => ['label' => 'Bitácora (regente)',         'view' => 'bitacora/index.php'],
+            '/admin'     => ['label' => 'Administración',             'view' => 'admin/index.php'],
+            '/403'       => ['label' => 'Página 403 (prohibido)',     'view' => 'errors/403.php'],
+            '/404'       => ['label' => 'Página 404 (no encontrada)', 'view' => 'errors/404.php'],
+            '/500'       => ['label' => 'Página 500 (error)',         'view' => 'errors/500.php'],
+        ];
+
+        // 1) ¿La vista existe en disco?
+        foreach ($expected as $route => $info) {
+            $file = (defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2)) . '/app/views/' . $info['view'];
+            $rows[] = [
+                'page' => $route,
+                'what' => $info['label'] . ' — vista',
+                'state' => is_file($file) ? 'ok' : 'bad',
+                'detail' => is_file($file) ? 'existe' : 'FALTA: app/views/' . $info['view'],
+            ];
+        }
+
+        // 2) ¿La ruta está registrada en routes.php?
+        $root = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2);
+        $routesSrc = '';
+        $routesFile = $root . '/app/config/routes.php';
+        if (is_file($routesFile)) $routesSrc = file_get_contents($routesFile);
+        foreach ($expected as $route => $info) {
+            if ($route === '/') continue;
+            $found = preg_match('#Router::get\(\'' . preg_quote($route, '#') . '\'#', $routesSrc) === 1;
+            $rows[] = [
+                'page' => $route,
+                'what' => 'Registro de ruta GET',
+                'state' => $found ? 'ok' : 'bad',
+                'detail' => $found ? 'registrada' : 'NO registrada en routes.php',
+            ];
+        }
+
+        // 3) Prueba HTTP real (loopback) de cada página pública o de errores
+        $scheme  = (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https' ? 'https' : 'http';
+        $host    = $_SERVER['HTTP_HOST'] ?? 'localhost';
+        $port    = $_SERVER['SERVER_PORT'] ?? '';
+        $base    = $scheme . '://' . preg_replace('/:\d+$/', '', $host) . (($port && $port != 80 && $port != 443) ? ':' . $port : '');
+        $ctx = stream_context_create([
+            'http' => ['method' => 'GET', 'timeout' => 4, 'follow_location' => 0, 'ignore_errors' => true,
+                       // Cabeceras anti-bloqueo: evita RateLimitMiddleware y bucles de sesión
+                       'header' => "X-Internal-Diagnostic: 1\r\nCache-Control: no-cache\r\nAccept: text/html"],
+            'ssl'  => ['verify_peer' => false, 'verify_peer_name' => false],
+        ]);
+        $testRoutes = ['/', '/login', '/403', '/404', '/500'];
+        foreach ($testRoutes as $route) {
+            $url = $base . $route;
+            $body = @file_get_contents($url, false, $ctx);
+            $code = 0;
+            foreach ($http_response_header ?? [] as $hdr) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $hdr, $m)) { $code = (int)$m[1]; break; }
+            }
+            if ($body === false && $code === 0) {
+                $rows[] = ['page' => $route, 'what' => 'Prueba HTTP local', 'state' => 'warn',
+                           'detail' => 'No se pudo conectar a ' . $url . ' (auto-test deshabilitado o bucle cerrado)'];
+                continue;
+            }
+            $expectOk = in_array($code, [200, 302], true);
+            // En /40x la app puede responder con código propio: aceptar también 403/404/500 explícitos
+            if ($route !== '/' && $route !== '/login' && !$expectOk && in_array($code, [403, 404, 500], true)) $expectOk = true;
+            $rows[] = ['page' => $route, 'what' => 'Prueba HTTP local', 'state' => $expectOk ? 'ok' : 'bad',
+                       'detail' => 'HTTP ' . $code];
+        }
+
+        // 4) Rutas protegidas: se espera 302 -> login si no hay sesión, o 200 si coincide el rol
+        $protected = ['/dashboard', '/students', '/courses', '/events', '/attendance', '/search', '/messages', '/reports', '/bitacora', '/admin'];
+        foreach ($protected as $route) {
+            $body = @file_get_contents($base . $route, false, $ctx);
+            $code = 0;
+            foreach ($http_response_header ?? [] as $hdr) {
+                if (preg_match('#^HTTP/\S+\s+(\d{3})#', $hdr, $m)) { $code = (int)$m[1]; break; }
+            }
+            if ($body === false && $code === 0) continue; // sin capacidad de auto-test
+            // 200 (sesión válida heredada) o 302 (redirige a login) = viva; 500/404 = falla
+            $alive = in_array($code, [200, 302], true);
+            // Nota: sin sesión propia, un 401/403 es comportamiento normal del candado
+            if (!$alive && in_array($code, [401, 403], true)) $alive = true;
+            $rows[] = ['page' => $route, 'what' => 'Prueba HTTP local (ruta protegida)', 'state' => $alive ? 'ok' : 'bad',
+                       'detail' => 'HTTP ' . $code . ($code >= 500 ? ' — ¡página cae!' : ($code === 404 ? ' — ruta no resuelve' : ''))];
+        }
+
+        // 5) Views huérfanas: archivos en app/views que nadie referencia
+        $viewDir = $root . '/app/views';
+        $allViews = [];
+        if (is_dir($viewDir)) {
+            // Clases globales de SPL: con \ porque este archivo vive en namespace App\Controllers
+            // (sin el backslash PHP las busca en App\Controllers\... y lanza "Class not found")
+            $it = new \RecursiveIteratorIterator(new \RecursiveDirectoryIterator($viewDir, \FilesystemIterator::SKIP_DOTS));
+            foreach ($it as $f) {
+                if ($f->isFile() && strtolower($f->getExtension()) === 'php') {
+                    $rel = str_replace('\\', '/', substr($f->getPathname(), strlen($viewDir) + 1));
+                    $allViews[$rel] = false;
+                }
+            }
+            $srcFiles = array_merge(
+                glob($root . '/app/controllers/*.php') ?: [],
+                glob($root . '/app/config/*.php') ?: [],
+                glob($root . '/app/views/layouts/*.php') ?: [],
+                [$root . '/index.php', $root . '/Router.php']
+            );
+            $bigSrc = '';
+            foreach ($srcFiles as $sf) { if (is_file($sf)) $bigSrc .= file_get_contents($sf); }
+            // Convención del helper view(): los formularios se referencian como
+            // "$module/form" con $module = plural del directorio (events/form <- 'form' + módulo events),
+            // por lo que también buscamos la terminación /stem.php dentro de su propio directorio.
+            foreach (array_keys($allViews) as $rel) {
+                $stem = basename($rel, '.php');
+                $dir  = dirname($rel);
+                if (strpos($bigSrc, $rel) !== false) { $allViews[$rel] = true; continue; }
+                if ($dir !== '.' && strpos($bigSrc, "'$dir/$stem") !== false) { $allViews[$rel] = true; continue; }
+                if ($dir !== '.' && strpos($bigSrc, "\"$dir/") !== false && strpos($bigSrc, "$stem") !== false) { $allViews[$rel] = true; continue; }
+                if ($dir !== '.' && $stem !== 'index' && strpos($bigSrc, "/$stem'") !== false) { $allViews[$rel] = true; continue; }
+            }
+            // layouts y errors siempre se consideran usados
+            foreach (array_keys($allViews) as $rel) {
+                if (strpos($rel, 'layouts/') === 0) $allViews[$rel] = true;
+            }
+        }
+        $orphans = array_keys(array_filter($allViews, fn($u) => $u === false));
+        $rows[] = [
+            'page' => 'app/views',
+            'what' => 'Vistas huérfanas (sin referencia)',
+            'state' => count($orphans) ? 'warn' : 'ok',
+            'detail' => count($orphans) ? implode(', ', $orphans) : 'todas referenciadas (' . count($allViews) . ')',
+        ];
+
+        return $rows;
+    }
+
+    /**
+     * Lee las últimas entradas de error del log de PHP de la aplicación.
+     */
+    private function diagnoseErrorLog() {
+        $root = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2);
+        $logFile = $root . '/logs/error.log';
+        if (!is_file($logFile)) {
+            return [['file' => 'logs/error.log', 'state' => 'warn', 'line' => 'El archivo de log no existe todavía (sin errores registrados).']];
+        }
+        $size = filesize($logFile);
+        $lines = [];
+        if ($size > 0) {
+            $fh = fopen($logFile, 'r');
+            if ($fh) {
+                fseek($fh, max(0, $size - 65536));
+                if ($size > 65536) fgets($fh); // descartar línea parcial
+                while (($l = fgets($fh)) !== false) { $lines[] = rtrim($l); }
+                fclose($fh);
+            }
+        }
+        $recent = array_slice($lines, -30);
+        $errors = array_values(array_filter($recent, fn($l) => stripos($l, 'error') !== false || stripos($l, 'warning') !== false || stripos($l, 'fatal') !== false));
+        $out = [];
+        $out[] = [
+            'file' => 'logs/error.log',
+            'state' => count($errors) ? 'bad' : 'ok',
+            'line' => number_format($size) . ' bytes · ' . count($lines) . ' líneas · ' . count($errors) . ' mensaje(s) de error/warning recientes',
+        ];
+        foreach (array_slice(array_reverse($errors), 0, 15) as $e) {
+            $out[] = ['file' => 'últimos errores', 'state' => 'bad', 'line' => substr($e, 0, 400)];
         }
         return $out;
+    }
+
+    /**
+     * Existencia y permisos de archivos/directorios críticos.
+     */
+    private function diagnoseFiles() {
+        $items = [
+            'index.php'                  => 'Front controller',
+            'Router.php'                 => 'Enrutador',
+            'app/config/database.php'    => 'Configuración de BD',
+            'app/config/routes.php'      => 'Definición de rutas',
+            'app/config/security.php'    => 'Configuración de seguridad',
+            'app/config/autoload.php'    => 'Autocargador',
+            'app/helpers/auth.php'       => 'Helpers de autenticación',
+            'app/helpers/permissions.php'=> 'Helpers de permisos',
+            'app/middleware/AuthMiddleware.php'      => 'Middleware de sesión',
+            'app/middleware/CsrfMiddleware.php'      => 'Middleware CSRF',
+            'app/middleware/SecurityHeadersMiddleware.php' => 'Middleware de cabeceras',
+            'app/models/Bitacora.php'    => 'Modelo Bitácora (v17)',
+            'app/controllers/BitacoraController.php' => 'Controlador Bitácora (v17)',
+            'app/views/bitacora/index.php'           => 'Vista Bitácora (v17)',
+            'app/views/bitacora/printable.php'       => 'Imprimible Bitácora (v17)',
+            'app/views/dashboard/index.php'          => 'Vista Dashboard (v17)',
+            'logs'                       => 'Directorio de logs',
+            'uploads'                    => 'Directorio de uploads',
+        ];
+        $rows = [];
+        $root = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2);
+        foreach ($items as $rel => $desc) {
+            $path = $root . '/' . $rel;
+            if (is_dir($path)) {
+                $writable = is_writable($path);
+                $rows[] = ['item' => $rel, 'desc' => $desc, 'state' => $writable ? 'ok' : 'warn',
+                           'detail' => 'directorio · ' . ($writable ? 'escribible' : 'NO escribible')];
+            } elseif (is_file($path)) {
+                $rows[] = ['item' => $rel, 'desc' => $desc, 'state' => 'ok',
+                           'detail' => 'existe · ' . number_format(filesize($path)) . ' B'];
+            } else {
+                $rows[] = ['item' => $rel, 'desc' => $desc, 'state' => 'bad', 'detail' => 'NO ENCONTRADO'];
+            }
+        }
+        return $rows;
     }
 }
