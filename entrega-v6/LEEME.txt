@@ -1,0 +1,14 @@
+ENTREGA v6 — Herramienta de test INMUNE al firewall (se ejecuta DENTRO de la app)
+
+SUBE ESTOS 3 ARCHIVOS (reemplazando los existentes):
+1) index.php            -> public_html/index.php
+2) ToolController.php   -> public_html/app/controllers/ToolController.php   (NUEVO)
+3) routes.php           -> public_html/app/config/routes.php
+
+BORRA el viejo public_html/diag/test-students.php (ya no se usa).
+
+COMO USAR:
+- Inicia sesion en https://regente2.colmarista.com/login
+- Abre:  https://regente2.colmarista.com/?tool=stcheck&k=regente-diag-2026
+- Tambien sirve: https://regente2.colmarista.com/tools/stcheck?k=regente-diag-2026
+- Informe plano (para copiar y pegar): agrega &plain=1 al final

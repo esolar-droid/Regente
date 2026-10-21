@@ -1,0 +1,10 @@
+ENTREGA v10 — Mejoras Estudiantes + Responsive + Predictivo
+Destinos (relativos a public_html/):
+  students_index.php        -> app/views/students/index.php
+  dashboard_index.php       -> app/views/dashboard/index.php
+  ApiController.php         -> app/controllers/ApiController.php   (NUEVO)
+  suggest.js                -> assets/js/suggest.js                (NUEVO)
+  app.css                   -> assets/css/app.css
+  routes.php                -> app/config/routes.php
+  app.php                   -> app/views/layouts/app.php
+NO subir database.php. Tras subir: logout+login y Ctrl+F5 (cache CSS/JS).

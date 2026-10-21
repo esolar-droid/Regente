@@ -29,51 +29,51 @@
                     <a class="navbar-item has-text-white" href="/dashboard">
                         <i class="fas fa-home"></i>&nbsp; Inicio
                     </a>
-                    
+
                     <?php if (can('view_students')): ?>
                         <a class="navbar-item has-text-white" href="/students">
                             <i class="fas fa-user-graduate"></i>&nbsp; Estudiantes
                         </a>
                     <?php endif; ?>
-                    
-                    <?php if (can('view_courses')): ?>
-                        <a class="navbar-item has-text-white" href="/courses">
-                            <i class="fas fa-chalkboard"></i>&nbsp; Cursos
-                        </a>
-                    <?php endif; ?>
-                    
+
                     <?php if (can('view_events')): ?>
                         <a class="navbar-item has-text-white" href="/events">
-                            <i class="fas fa-calendar-alt"></i>&nbsp; Eventos
+                            <i class="fas fa-calendar-check"></i>&nbsp; Asistencia
                         </a>
                     <?php endif; ?>
-                    
-                    <?php if (can('view_messages')): ?>
+
+                    <?php if (can('view_messages') || can('send_whatsapp')): ?>
                         <a class="navbar-item has-text-white" href="/messages">
-                            <i class="fas fa-envelope"></i>&nbsp; Mensajes
+                            <i class="fab fa-whatsapp"></i>&nbsp; Mensajería
                         </a>
                     <?php endif; ?>
-                    
+
                     <?php if (can('view_reports')): ?>
                         <a class="navbar-item has-text-white" href="/reports">
                             <i class="fas fa-chart-bar"></i>&nbsp; Reportes
                         </a>
                     <?php endif; ?>
-                    
-                    <?php if (can('view_users')): ?>
-                        <a class="navbar-item has-text-white" href="/users">
-                            <i class="fas fa-users"></i>&nbsp; Usuarios
+
+                    <?php if (can('view_courses')): ?>
+                        <a class="navbar-item has-text-white" href="/search">
+                            <i class="fas fa-search"></i>&nbsp; Buscar
                         </a>
                     <?php endif; ?>
-                    
-                    <?php if (can('view_management')): ?>
-                        <a class="navbar-item has-text-white" href="/management">
-                            <i class="fas fa-calendar"></i>&nbsp; Gestión
+
+                    <?php if (can('view_bitacora') || isRegente()): ?>
+                        <a class="navbar-item has-text-white" href="/bitacora">
+                            <i class="fas fa-chalkboard-teacher"></i>&nbsp; Bitácora
+                        </a>
+                    <?php endif; ?>
+
+                    <?php if (isAdmin()): ?>
+                        <a class="navbar-item has-text-white" href="/admin">
+                            <i class="fas fa-shield-alt"></i>&nbsp; Administración
                         </a>
                     <?php endif; ?>
                 <?php endif; ?>
             </div>
-            
+
             <div class="navbar-end">
                 <?php if (isAuthenticated()): ?>
                     <div class="navbar-item has-dropdown is-hoverable">

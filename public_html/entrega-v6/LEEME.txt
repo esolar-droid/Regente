@@ -1,0 +1,8 @@
+ENTREGA v6 — Herramienta de test que YA NO puede ser redirigida al dashboard
+
+Sube estos 3 archivos (reemplazando):
+1) index.php                 -> public_html/index.php            (NUEVO: sirve la herramienta internamente)
+2) ToolController.php          -> public_html/app/controllers/ToolController.php   (NUEVO archivo)
+3) routes.php                  -> public_html/app/config/routes.php    (ya venia en v5, vuelve a subirlo por si acaso)
+
+BORRA de tu servidor el viejo public_html/diag/test-students.php (ya no se usa).

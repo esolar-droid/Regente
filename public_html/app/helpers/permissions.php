@@ -8,8 +8,14 @@ if (!function_exists('can')) {
         if (!isAuthenticated()) {
             return false;
         }
-        
-        $user = user();
+
+        // v8: el ADMINISTRADOR puede con todo, incluso si su rol no esta
+        // enlazado en role_permissions (evita menu vacio siendo admin).
+        if (isAdmin() || userRoleId() === 1 || userRole() === 'administrador') {
+            return true;
+        }
+
+        $user = user(true); // objeto real del modelo User (v7)
         if ($user === null) {
             return false;
         }

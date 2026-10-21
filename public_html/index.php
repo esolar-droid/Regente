@@ -26,8 +26,8 @@
 // APP_ROOT = /home/regente2.colmarista.com/public_html/
 // The app directory is at the same level as this file
 
-define('APP_ROOT', __DIR__);
-define('PUBLIC_ROOT', __DIR__);
+if (!defined('APP_ROOT'))    { define('APP_ROOT', __DIR__); }
+if (!defined('PUBLIC_ROOT')) { define('PUBLIC_ROOT', __DIR__); }
 
 // Error reporting (set to 0 in production)
 error_reporting(E_ALL);
@@ -94,6 +94,19 @@ require_once APP_ROOT . '/app/App.php';
 // EJECUCION DE LA APLICACION
 // ============================================================================
 
+// ============================================================================
+// HERRAMIENTAS DE DIAGNOSTICO (servidas por la MISMA app: inmunes al firewall)
+// URL: https://regente2.colmarista.com/tools/stcheck?k=CLAVE[&plain=1]
+// ============================================================================
+$__q = (string)($_SERVER["QUERY_STRING"] ?? "");
+$__st = ($_GET["tool"] ?? $_POST["tool"] ?? (preg_match("/(^|&)tool=stcheck(&|$)/", $__q) ? "stcheck" : ""));
+if ($__st === "" && strpos($_SERVER["REQUEST_URI"] ?? "", "tools/stcheck") !== false) { $__st = "stcheck"; }
+if ($__st === "stcheck") {
+    require_once APP_ROOT . "/app/controllers/Controller.php";
+    require_once APP_ROOT . "/app/controllers/ToolController.php";
+    (new App\Controllers\ToolController())->stcheck();
+    exit;
+}
 // Initialize and run the application
 try {
     $app = new App();

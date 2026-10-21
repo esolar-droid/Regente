@@ -82,14 +82,17 @@ class Student extends Model {
             $stmt->execute([$this->id]);
             $results = $stmt->fetchAll(\PDO::FETCH_KEY_PAIR);
             
+            // 'falta' es el valor oficial; se suman restos legados de 'ausencia' por si acaso.
+            $faltas = ($results['falta'] ?? 0) + ($results['ausencia'] ?? 0);
+
             return [
                 'atraso' => $results['atraso'] ?? 0,
                 'licencia' => $results['licencia'] ?? 0,
-                'ausencia' => $results['ausencia'] ?? 0,
+                'falta' => $faltas,
             ];
         } catch (\PDOException $e) {
             error_log("Student getEventCounts() error: " . $e->getMessage());
-            return ['atraso' => 0, 'licencia' => 0, 'ausencia' => 0];
+            return ['atraso' => 0, 'licencia' => 0, 'falta' => 0];
         }
     }
     
@@ -171,15 +174,23 @@ class Student extends Model {
         $params  = [];
 
         if (!empty($f['search'])) {
-            $where[]  = "(e.nombre_completo LIKE ? OR e.codigo_bnb LIKE ?)";
-            $s        = '%' . $f['search'] . '%';
-            $params[] = $s; $params[] = $s;
+            // Busqueda por PALABRAS: cada termino se busca en nombre O codigo,
+            // en cualquier orden ("maria lopez" encuentra "Lopez de Maria, Ana")
+            $words = preg_split('/\s+/', trim($f['search']), -1, PREG_SPLIT_NO_EMPTY);
+            foreach (array_slice($words, 0, 6) as $w) {
+                $where[]  = "(e.nombre_completo LIKE ? OR e.codigo_bnb LIKE ?)";
+                $s        = '%' . $w . '%';
+                $params[] = $s; $params[] = $s;
+            }
         }
         if (!empty($f['estado']) && in_array($f['estado'], self::STATES, true)) {
             $where[]  = "e.estado = ?";
             $params[] = $f['estado'];
         } elseif (($f['estado'] ?? '') === 'activos') {
             $where[] = "e.estado <> 'retirado'";
+        } elseif (($f['estado'] ?? '') === 'cumpleanos') {
+            // Filtro Cumpleañeros: nacidos hoy, ordenados por curso
+            $where[] = "e.fecha_nacimiento IS NOT NULL AND DATE_FORMAT(e.fecha_nacimiento, '%m-%d') = DATE_FORMAT(CURDATE(), '%m-%d')";
         }
         if (!empty($f['id_curso'])) {
             $where[]  = "e.id_curso = ?";
@@ -195,11 +206,14 @@ class Student extends Model {
             $stmt->execute($params);
             $total = (int)$stmt->fetchColumn();
 
+            $order = (($f['estado'] ?? '') === 'cumpleanos')
+                ? 'ORDER BY c.curso ASC, e.nombre_completo ASC'   // cumpleañeros: agrupados por curso
+                : 'ORDER BY e.nombre_completo ASC';
             $sql = "SELECT e.*, c.curso AS curso_nombre, c.paralelo AS curso_paralelo
                     FROM estudiantes e
                     LEFT JOIN cursos c ON e.id_curso = c.id
                     $sqlWhere
-                    ORDER BY e.nombre_completo ASC
+                    $order
                     LIMIT $perPage OFFSET " . (($page - 1) * $perPage);
             $stmt = $db->prepare($sql);
             $stmt->execute($params);
@@ -224,6 +238,37 @@ class Student extends Model {
             return $out;
         } catch (\PDOException $e) {
             error_log("Student stateCounts() error: " . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Agregar de eventos (atraso/falta/licencia) para VARIOS estudiantes en
+     * una sola consulta. 'falta' incluye restos legados de 'ausencia'.
+     * Devuelve [id_estudiante => ['atraso'=>n,'falta'=>n,'licencia'=>n]].
+     */
+    public static function eventCountsForIds(array $ids) {
+        $ids = array_values(array_filter(array_map('intval', $ids)));
+        if (!$ids) return [];
+        try {
+            $db = \Database::getConnection();
+            $ph = implode(',', array_fill(0, count($ids), '?'));
+            $stmt = $db->prepare(
+                "SELECT id_estudiante, tipo_evento, COUNT(*) c
+                 FROM eventos WHERE id_estudiante IN ($ph)
+                 GROUP BY id_estudiante, tipo_evento"
+            );
+            $stmt->execute($ids);
+            $out = [];
+            foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
+                $id = (int)$r['id_estudiante'];
+                $out[$id] ??= ['atraso' => 0, 'falta' => 0, 'licencia' => 0];
+                $tipo = $r['tipo_evento'] === 'ausencia' ? 'falta' : $r['tipo_evento'];
+                if (isset($out[$id][$tipo])) $out[$id][$tipo] += (int)$r['c'];
+            }
+            return $out;
+        } catch (\PDOException $e) {
+            error_log("Student eventCountsForIds() error: " . $e->getMessage());
             return [];
         }
     }
