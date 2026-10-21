@@ -9,7 +9,7 @@ $z = fn($v) => \App\Controllers\ReportController::z($v);
 
 /**
  * Rejilla reutilizable para "por días" / mensual / lapso.
- * Definida ANTES de su uso (las definiciones de función dentro de bloques
+ * Definida ANTES de su uso (las definiciones de funcin dentro de bloques
  * condicionales no se hoistean en PHP -> antes producía página en blanco).
  */
 if (!function_exists('repGrid')) {
@@ -190,7 +190,7 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
       <?php if ($kind === 'mensual'): ?><strong>Mes:</strong> <?= $h($result['header']['mes']) ?>
       <?php else: ?><strong>Lapso:</strong> <?= $h($result['header']['desde']) ?> → <?= $h($result['header']['hasta']) ?><?php endif; ?></p>
     <?= repGrid($result['roster'], $result['days'], $result['grid'], $result['totals'], $h, $z, true) ?>
-    <div class="legend"><b>P</b> = Presente · <b>A</b> = Atraso · <b>L</b> = Licencia · <b>F</b> = Falta · gris = inhábil/feriado · suma vacía = 0.</div>
+    <div class="legend"><b>P</b> = Presente · <b>A</b> = Atraso · <b>L</b> = Licencia · <b>F</b> = Falta · gris = inhábil/feriado · suma vaca = 0.</div>
     <?php if ($charts): ?>
       <div class="charts" id="chartArea"></div>
       <script>window.REP_CHARTS = [
@@ -209,11 +209,32 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
   <div class="sheet">
     <p class="doc-meta"><strong>Curso:</strong> <?= $h($result['header']['curso']) ?> · <strong>Gestión:</strong> <?= (int)$result['header']['anio'] ?></p>
     <table class="grid">
-      <thead>
-        <tr><th rowspan="2" class="name" style="text-align:left">Estudiante</th>
-          <?php foreach ($mesEs as $m): ?><th colspan="3"><?= $h($m) ?></th><?php endforeach; ?><th colspan="3">TOTAL</th></tr>
-        <tr><?php for ($i = 0; $i < 13; $i): ?><th>A</th><th>L</th><th>F</th><?php endfor; ?></tr>
-      </thead>
+      
+      
+<thead>
+  <tr>
+    <th rowspan="2" class="name" style="text-align:left">
+      Estudiante
+    </th>
+
+    <?php foreach ($mesEs as $m): ?>
+      <th colspan="3"><?= $h($m) ?></th>
+    <?php endforeach; ?>
+
+    <th colspan="3">TOTAL</th>
+  </tr>
+
+  <tr>
+    <?php for ($i = 0; $i < 13; $i++): ?>
+      <th>A</th>
+      <th>L</th>
+      <th>F</th>
+    <?php endfor; ?>
+  </tr>
+</thead>
+      
+      
+      
       <tbody>
         <?php foreach ($result['perStudent'] as $p): ?>
           <tr><td class="name"><?= $h($p['nombre']) ?></td>
@@ -290,3 +311,4 @@ setTimeout(function () {
 </script>
 </body>
 </html>
+
