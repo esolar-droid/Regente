@@ -121,10 +121,15 @@ class ReportController extends Controller {
         $tid  = (int)($q['profesor'] ?? 0);
         $subj = trim((string)($q['asignatura'] ?? ''));
 
+        // v17.1: filtro por tipo de evento ('' = Todos, A, L o F).
+        $tipo = strtoupper(trim((string)($q['tipo_evento'] ?? '')));
+        if (!in_array($tipo, ['A', 'L', 'F'], true)) $tipo = '';
+        $tipos = $tipo !== '' ? [$tipo] : [];
+
         $roster = Report::roster($cid);
         if (!$roster) return ['error' => 'No hay estudiantes activos en el curso seleccionado.'];
         $ids   = array_map(fn($s) => (int)$s['id'], $roster);
-        $marks = Report::marks($ids, $from, $to);
+        $marks = Report::marks($ids, $from, $to, $tipos);
 
         // Días hábiles base del rango (totales correctos aunque no se muestren)
         $allBdays = $this->businessDays($from, $to);
@@ -149,6 +154,22 @@ class ReportController extends Controller {
             return empty($daysWithClass) || isset($daysWithClass[(int)date('N', strtotime($d))]);
         }));
 
+        // v17.2: con filtro de tipo (A/L/F), la tabla muestra SOLO los estudiantes
+        // que tienen al menos un evento de ese tipo en el rango; sin filtro (Todos)
+        // se mantiene el roster completo.
+        if ($tipo !== '') {
+            $roster = array_values(array_filter($roster, function ($s) use ($marks, $bdays, $tipo) {
+                $sid = (int)$s['id'];
+                foreach ($bdays as $d) {
+                    if (($marks[$sid][$d]['t'] ?? '') === $tipo) return true;
+                }
+                return false;
+            }));
+            if (!$roster) {
+                return ['error' => 'Ningún estudiante del curso tiene eventos del tipo seleccionado en el rango indicado.'];
+            }
+        }
+
         $grid = Report::matrix($roster, $bdays, $marks);
 
         // Totales sobre TODOS los días hábiles del rango (no solo los mostrados)
@@ -159,8 +180,13 @@ class ReportController extends Controller {
             foreach (($marks[$sid] ?? []) as $d => $m) {
                 if (in_array($d, $allBdays, true)) $cnt[$m['t']]++;
             }
-            $totals[$sid] = ['P' => max(0, count($allBdays) - $cnt['A'] - $cnt['L'] - $cnt['F']),
-                             'A' => $cnt['A'], 'L' => $cnt['L'], 'F' => $cnt['F']];
+            if ($tipo !== '') {
+                // Con filtro de tipo: P no aplica; se muestran solo los del tipo elegido.
+                $totals[$sid] = ['P' => null, 'A' => $cnt['A'], 'L' => $cnt['L'], 'F' => $cnt['F']];
+            } else {
+                $totals[$sid] = ['P' => max(0, count($allBdays) - $cnt['A'] - $cnt['L'] - $cnt['F']),
+                                 'A' => $cnt['A'], 'L' => $cnt['L'], 'F' => $cnt['F']];
+            }
         }
 
         // Agregados para los 4 gráficos (sobre los días mostrados)
@@ -169,7 +195,8 @@ class ReportController extends Controller {
         foreach ($bdays as $d) {
             foreach ($roster as $s) {
                 $m = $marks[(int)$s['id']][$d] ?? null;
-                if ($m) { $sum[$m['t']]++; $acc[$m['t']]++; } else { $sum['P']++; }
+                if ($m) { $sum[$m['t']]++; $acc[$m['t']]++; }
+                elseif ($tipo === '') { $sum['P']++; } // sin filtro: cuenta como presente
             }
             $lineSeries[] = ['d' => $d, 'A' => $acc['A'], 'L' => $acc['L'], 'F' => $acc['F']];
         }
@@ -183,7 +210,8 @@ class ReportController extends Controller {
         return [
             'kind' => 'dias',
             'header' => ['curso' => $course ? $course->curso : ('#' . $cid), 'desde' => $from, 'hasta' => $to,
-                         'profesor' => $this->teacherName($tid), 'asignatura' => $subj !== '' ? $subj : 'Todas'],
+                         'profesor' => $this->teacherName($tid), 'asignatura' => $subj !== '' ? $subj : 'Todas',
+                         'tipo' => $tipo], // v17.1: '' = Todos | A | L | F
             'roster' => $roster, 'bdays' => $bdays, 'grid' => $grid, 'totals' => $totals,
             'marks' => $marks, 'sum' => $sum, 'perStudent' => $perStudent, 'lineSeries' => $lineSeries,
             'filteredBySchedule' => !empty($daysWithClass),
@@ -363,7 +391,8 @@ class ReportController extends Controller {
     private function title(array $r) {
         switch ($r['kind'] ?? '') {
             case 'individual': return 'Reporte Individual — ' . ($r['student']['nombre'] ?? '') . ' (' . ($r['student']['curso'] ?? '') . ')';
-            case 'dias':       return 'Reporte por Días — Curso ' . $r['header']['curso'] . ' · ' . $r['header']['desde'] . ' a ' . $r['header']['hasta'];
+            case 'dias':       $tl = ['A'=>' · solo Atrasos','L'=>' · solo Licencias','F'=>' · solo Faltas'][$r['header']['tipo'] ?? ''] ?? '';
+                               return 'Reporte por Días — Curso ' . $r['header']['curso'] . ' · ' . $r['header']['desde'] . ' a ' . $r['header']['hasta'] . $tl;
             case 'semanal':    return 'Reporte Semanal — ' . $r['nivel'] . ' · Semana del ' . ($r['week'][0] ?? '');
             case 'mensual':    return 'Reporte Mensual — Curso ' . $r['header']['curso'] . ' · ' . $r['header']['mes'];
             case 'lapso':      return 'Reporte de Lapso — Curso ' . $r['header']['curso'] . ' · ' . $r['header']['desde'] . ' a ' . $r['header']['hasta'];
@@ -424,22 +453,27 @@ class ReportController extends Controller {
             case 'lapso':
                 $h = $r['header'];
                 $rows[] = ['Curso', $h['curso'], 'Desde', $h['desde'] ?? ($h['mes'] ?? ''), 'Hasta', $h['hasta'] ?? ''];
-                if ($r['kind'] === 'dias') $rows[] = ['Profesor', $h['profesor'], 'Asignatura', $h['asignatura']];
+                if ($r['kind'] === 'dias') {
+                    $tl = ['A'=>'Atrasos','L'=>'Licencias','F'=>'Faltas'][$h['tipo'] ?? ''] ?? 'Todos';
+                    $rows[] = ['Profesor', $h['profesor'], 'Asignatura', $h['asignatura'], 'Tipo de evento', $tl];
+                }
                 $rows[] = [];
                 $bdays = $r['bdays'];
+                $diasFilter = ($r['kind'] === 'dias' && ($h['tipo'] ?? '') !== '');
                 $head = ['Estudiante'];
                 foreach ($bdays as $d) $head[] = date('d/m', strtotime(is_array($d) ? $d['f'] : $d));
-                $head = array_merge($head, ['P', 'A', 'L', 'F']);
+                $head = array_merge($head, $diasFilter ? ['A', 'L', 'F'] : ['P', 'A', 'L', 'F']);
                 $rows[] = $head;
                 foreach ($r['roster'] as $s) {
                     $sid = (int)$s['id'];
                     $line = [$s['nombre_completo']];
                     foreach ($bdays as $d) {
                         $iso = is_array($d) ? $d['f'] : $d;
-                        $line[] = $r['grid'][$sid][$iso]['t'] ?? 'P';
+                        $line[] = $r['grid'][$sid][$iso]['t'] ?? ($diasFilter ? '-' : 'P');
                     }
                     $t = $r['totals'][$sid] ?? ['P'=>0,'A'=>0,'L'=>0,'F'=>0];
-                    $rows[] = array_merge($line, [self::z($t['P']), self::z($t['A']), self::z($t['L']), self::z($t['F'])]);
+                    $tail = [$t['P'], self::z($t['A']), self::z($t['L']), self::z($t['F'])];
+                    $rows[] = array_merge($line, $diasFilter ? array_slice($tail, 1) : $tail);
                 }
                 break;
 

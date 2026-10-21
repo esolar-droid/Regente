@@ -121,17 +121,29 @@ class Report {
      * Marks de eventos A/L/F para un conjunto de estudiantes en un rango.
      * Devuelve [id_estudiante][fecha] => ['t'=>'A|L|F','j'=>justificacion].
      */
-    public static function marks(array $studentIds, $from, $to) {
+    public static function marks(array $studentIds, $from, $to, array $tipos = []) {
         $ids = array_values(array_filter(array_map('intval', $studentIds)));
         if (!$ids || !$from || !$to) return [];
         try {
             $db = \Database::getConnection();
             $ph = implode(',', array_fill(0, count($ids), '?'));
+            // v17.1: filtro opcional por tipo de evento ('A'|'L'|'F'). Vacío = todos.
+            $tipoCond = '';
+            $shorts = array_values(array_intersect(['A', 'L', 'F'], array_map('strtoupper', $tipos)));
+            if ($shorts) {
+                $fmap = [];
+                foreach ($shorts as $s) {
+                    if ($s === 'A') $fmap[] = 'atraso';
+                    elseif ($s === 'L') $fmap[] = 'licencia';
+                    else { $fmap[] = 'falta'; $fmap[] = 'ausencia'; }
+                }
+                $tipoCond = ' AND tipo_evento IN (' . implode(',', array_fill(0, count($fmap), '?')) . ')';
+            }
             $stmt = $db->prepare(
                 "SELECT id_estudiante, DATE_FORMAT(fecha_evento,'%Y-%m-%d') AS f, tipo_evento, justificacion
-                 FROM eventos WHERE fecha_evento BETWEEN ? AND ? AND id_estudiante IN ($ph)"
+                 FROM eventos WHERE fecha_evento BETWEEN ? AND ? AND id_estudiante IN ($ph)" . $tipoCond
             );
-            $stmt->execute(array_merge([$from, $to], $ids));
+            $stmt->execute(array_merge([$from, $to], $ids, $fmap));
             $out = [];
             foreach ($stmt->fetchAll(\PDO::FETCH_ASSOC) as $r) {
                 $short = Event::typeToShort($r['tipo_evento']);

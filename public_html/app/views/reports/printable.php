@@ -13,7 +13,7 @@ $z = fn($v) => \App\Controllers\ReportController::z($v);
  * condicionales no se hoistean en PHP -> antes producía página en blanco).
  */
 if (!function_exists('repGrid')) {
-function repGrid(array $roster, array $cols, array $grid, array $totals, callable $h, callable $z, bool $twoLineHeader): string {
+function repGrid(array $roster, array $cols, array $grid, array $totals, callable $h, callable $z, bool $twoLineHeader, bool $skipP = false): string {
     ob_start(); ?>
     <div style="overflow-x:auto">
     <table class="grid">
@@ -28,17 +28,24 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
             <small><?= $h(['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'][$w - 1]) ?></small>
           </th>
         <?php endforeach; ?>
-        <th>P</th><th>A</th><th>L</th><th>F</th></tr></thead>
+        <?php if (!$skipP): ?><th>P</th><?php endif; ?><th>A</th><th>L</th><th>F</th></tr></thead>
       <tbody>
         <?php foreach ($roster as $i => $s): $sid = (int)$s['id']; $t = $totals[$sid] ?? ['P'=>0,'A'=>0,'L'=>0,'F'=>0]; ?>
           <tr><td class="name"><?= $i + 1 ?></td><td class="name"><?= $h($s['nombre_completo']) ?></td>
             <?php foreach ($cols as $col):
                 $iso = is_array($col) ? $col['f'] : $col;
                 if (is_array($col) && !empty($col['inh'])) { echo '<td class="inh"></td>'; continue; }
-                $m = $grid[$sid][$iso] ?? null; $tt = $m['t'] ?? 'P'; ?>
-              <td class="mark-<?= $h($tt) ?>"><?= $h($tt) ?></td>
-            <?php endforeach; ?>
-            <td class="sumcell"><?= $h($z($t['P'])) ?></td><td class="sumcell"><?= $h($z($t['A'])) ?></td>
+                $m = $grid[$sid][$iso] ?? null;
+                if ($m) { ?>
+                  <td class="mark-<?= $h($m['t']) ?>"><?= $h($m['t']) ?></td>
+                <?php } elseif ($skipP) { ?>
+                  <td class="none">—</td>
+                <?php } else { ?>
+                  <td class="mark-P">P</td>
+                <?php }
+            endforeach; ?>
+            <?php if (!$skipP): ?><td class="sumcell"><?= $h($z($t['P'])) ?></td><?php endif; ?>
+            <td class="sumcell"><?= $h($z($t['A'])) ?></td>
             <td class="sumcell"><?= $h($z($t['L'])) ?></td><td class="sumcell"><?= $h($z($t['F'])) ?></td></tr>
         <?php endforeach; ?>
       </tbody>
@@ -77,6 +84,7 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
   .mark-A { background:rgba(243,156,18,.45); font-weight:bold; }
   .mark-L { background:rgba(52,152,219,.40); font-weight:bold; }
   .mark-F { background:rgba(231,76,60,.45); font-weight:bold; color:#7a0f0f; }
+  .none { color:#94a3b8; } /* v17.1: celda sin eventos cuando se filtra por tipo */
   .inh { background:#d9dde3 !important; }
   .sumcell { font-weight:bold; background:#eef2f7; }
   .legend { margin-top:6px; font-size:9px; color:#333; border-top:1px dashed #9aa7b8; padding-top:4px; }
@@ -136,19 +144,26 @@ function repGrid(array $roster, array $cols, array $grid, array $totals, callabl
     <?php endif; ?>
   </div>
 
-<?php elseif ($kind === 'dias'): ?>
+<?php elseif ($kind === 'dias'): $skipP = ($result['header']['tipo'] ?? '') !== ''; ?>
   <div class="sheet">
     <p class="doc-meta"><strong>Curso:</strong> <?= $h($result['header']['curso']) ?> ·
        <strong>Rango:</strong> <?= $h($result['header']['desde']) ?> → <?= $h($result['header']['hasta']) ?> ·
        <strong>Profesor:</strong> <?= $h($result['header']['profesor']) ?> ·
-       <strong>Asignatura:</strong> <?= $h($result['header']['asignatura']) ?></p>
-    <?= repGrid($result['roster'], array_map(fn($d)=>['f'=>$d], $result['bdays']), $result['grid'], $result['totals'], $h, $z, false) ?>
-    <div class="legend"><b>P</b> = Presente · <b>A</b> = Atraso · <b>L</b> = Licencia · <b>F</b> = Falta · suma vacía = 0.</div>
+       <strong>Asignatura:</strong> <?= $h($result['header']['asignatura']) ?> ·
+       <strong>Tipo de evento:</strong> <?= $skipP ? $h(['A'=>'Atrasos','L'=>'Licencias','F'=>'Faltas'][$result['header']['tipo']]) : 'Todos' ?></p>
+    <?= repGrid($result['roster'], array_map(fn($d)=>['f'=>$d], $result['bdays']), $result['grid'], $result['totals'], $h, $z, false, $skipP) ?>
+    <div class="legend"><?= $skipP
+        ? '<b>A</b> = Atraso · <b>L</b> = Licencia · <b>F</b> = Falta · — = sin eventos ese día · suma vacía = 0.'
+        : '<b>P</b> = Presente · <b>A</b> = Atraso · <b>L</b> = Licencia · <b>F</b> = Falta · suma vacía = 0.' ?></div>
     <?php if ($charts): ?>
       <div class="charts" id="chartArea"></div>
       <script>window.REP_CHARTS = [
         {type:'pie', labels:['Presente','Con atraso'], data:[<?= (int)$result['sum']['P'] ?>,<?= (int)$result['sum']['A'] ?>], colors:['#2ECC71','#F39C12'], title:'P vs Atraso'},
+        <?php if ($skipP): $tl = ['A'=>'Atrasos','L'=>'Licencias','F'=>'Faltas'][$result['header']['tipo']]; ?>
+        {type:'bar', labels:['<?= $h($tl) ?>'], data:[<?= (int)$result['sum'][$result['header']['tipo']] ?>], colors:['#F39C12'], title:'Total <?= $h($tl) ?>'},
+        <?php else: ?>
         {type:'bar', labels:['P','A','L','F'], data:[<?= (int)$result['sum']['P'] ?>,<?= (int)$result['sum']['A'] ?>,<?= (int)$result['sum']['L'] ?>,<?= (int)$result['sum']['F'] ?>], colors:['#2ECC71','#F39C12','#3498DB','#E74C3C'], title:'Totales PALF'},
+        <?php endif; ?>
         {type:'radar', labels:<?= json_encode(array_map(fn($p)=>'#'.$p['n'], $result['perStudent'])) ?>, series:[
           {label:'A', data:<?= json_encode(array_column($result['perStudent'],'A')) ?>, color:'#F39C12'},
           {label:'L', data:<?= json_encode(array_column($result['perStudent'],'L')) ?>, color:'#3498DB'},

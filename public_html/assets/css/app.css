@@ -663,6 +663,7 @@ body.sidebar-collapsed .app-body {
 .mark-A { background:rgba(243,156,18,.45); font-weight:700; }
 .mark-L { background:rgba(52,152,219,.40); font-weight:700; }
 .mark-F { background:rgba(231,76,60,.45); font-weight:700; color:#7a0f0f; }
+.mark-none { color:#94a3b8; } /* v17.1: celda sin eventos cuando se filtra por tipo */
 .rep-inh { background:#d9dde3 !important; }
 .sumcell { background:#eef2f7; font-weight:700; }
 .rep-sumrow td { background:#eef2f7; }

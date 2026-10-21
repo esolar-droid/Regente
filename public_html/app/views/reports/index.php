@@ -145,16 +145,27 @@ function repHeader($h, $title) { ?>
       <form method="get" action="/reports" class="box">
         <input type="hidden" name="tab" value="dias">
         <div class="columns is-vcentered is-multiline">
-          <div class="column is-3">
+          <!-- v17.1: curso reducido a la mitad (is-3 → is-2) para dar sitio al filtro Tipo -->
+          <div class="column is-2">
             <label class="label">Curso</label>
             <div class="select is-fullwidth"><select name="curso">
               <option value="">— Curso —</option>
               <?php foreach ($courses as $c): ?><option value="<?= (int)$c['id'] ?>" <?= (int)($q['curso'] ?? 0) === (int)$c['id'] ? 'selected' : '' ?>><?= $h($c['curso']) ?></option><?php endforeach; ?>
             </select></div>
           </div>
+          <div class="column is-2">
+            <label class="label">Tipo de evento</label>
+            <div class="select is-fullwidth"><select name="tipo_evento">
+              <?php $tipoSel = strtoupper(trim((string)($q['tipo_evento'] ?? ''))); if (!in_array($tipoSel, ['A','L','F'], true)) $tipoSel = ''; ?>
+              <option value="" <?= $tipoSel === '' ? 'selected' : '' ?>>Todos</option>
+              <option value="A" <?= $tipoSel === 'A' ? 'selected' : '' ?>>Atrasos</option>
+              <option value="L" <?= $tipoSel === 'L' ? 'selected' : '' ?>>Licencias</option>
+              <option value="F" <?= $tipoSel === 'F' ? 'selected' : '' ?>>Faltas</option>
+            </select></div>
+          </div>
           <div class="column is-2"><label class="label">Desde</label><input class="input" type="date" name="desde" value="<?= $h($q['desde'] ?? date('Y-m-d')) ?>"></div>
           <div class="column is-2"><label class="label">Hasta</label><input class="input" type="date" name="hasta" value="<?= $h($q['hasta'] ?? date('Y-m-d')) ?>"></div>
-          <div class="column is-3">
+          <div class="column is-2">
             <label class="label">Profesor</label>
             <div class="select is-fullwidth"><select name="profesor">
               <option value="">Todos</option>
@@ -175,33 +186,44 @@ function repHeader($h, $title) { ?>
       <?php if ($res && !empty($res['error'])): ?><div class="notification is-warning"><?= $h($res['error']) ?></div><?php endif; ?>
       <?php if ($res && empty($res['error']) && $res['kind'] === 'dias'): ?>
         <div class="box rep-doc">
-          <?php repHeader($h, 'Reporte por Días — Curso ' . $res['header']['curso']); ?>
+          <?php $tipoFiltro = ($res['header']['tipo'] ?? '') !== ''; $tipoLbl = ['A'=>'Atrasos','L'=>'Licencias','F'=>'Faltas'][$res['header']['tipo'] ?? ''] ?? ''; ?>
+          <?php repHeader($h, 'Reporte por Días — Curso ' . $res['header']['curso'] . ($tipoFiltro ? ' · solo ' . $tipoLbl : '')); ?>
           <p class="mb-2"><?= $h($res['header']['desde']) ?> → <?= $h($res['header']['hasta']) ?> ·
              Profesor: <strong><?= $h($res['header']['profesor']) ?></strong> ·
-             Asignatura: <strong><?= $h($res['header']['asignatura']) ?></strong>
+             Asignatura: <strong><?= $h($res['header']['asignatura']) ?></strong> ·
+             Tipo de evento: <strong><?= $tipoFiltro ? $h($tipoLbl) : 'Todos' ?></strong>
              <?= $res['filteredBySchedule'] ? '<span class="tag is-info is-light">columnas filtradas por horario</span>' : '<span class="tag is-warning is-light">sin horarios cargados: se muestran todos los días hábiles</span>' ?></p>
 
           <div class="table-container">
             <table class="table is-bordered is-narrow rep-table rep-days">
               <thead><tr><th class="rep-name">#</th><th class="rep-name">Estudiante</th>
                 <?php foreach ($res['bdays'] as $d): ?><th><?= $h(date('d', strtotime($d))) ?><br><small><?= $h(['Lun','Mar','Mié','Jue','Vie'][(int)date('N', strtotime($d)) - 1]) ?></small></th><?php endforeach; ?>
-                <th>P</th><th>A</th><th>L</th><th>F</th></tr></thead>
+                <?php if (!$tipoFiltro): ?><th>P</th><?php endif; ?><th>A</th><th>L</th><th>F</th></tr></thead>
               <tbody>
                 <?php foreach ($res['roster'] as $i => $s): $sid = (int)$s['id']; $t = $res['totals'][$sid]; ?>
                   <tr>
                     <td class="rep-num"><?= $i + 1 ?></td>
                     <td class="rep-name"><?= $h($s['nombre_completo']) ?></td>
                     <?php foreach ($res['bdays'] as $d): $m = $res['grid'][$sid][$d] ?? null; ?>
-                      <td class="<?= $m ? 'mark-' . $h($m['t']) : 'mark-P' ?>" title="<?= $h($m['j'] ?? '') ?>"><?= $h($m['t'] ?? 'P') ?></td>
+                      <?php if ($m): ?>
+                        <td class="mark-<?= $h($m['t']) ?>" title="<?= $h($m['j'] ?? '') ?>"><?= $h($m['t']) ?></td>
+                      <?php elseif ($tipoFiltro): ?>
+                        <td class="mark-none" title="">—</td>
+                      <?php else: ?>
+                        <td class="mark-P" title="">P</td>
+                      <?php endif; ?>
                     <?php endforeach; ?>
-                    <td class="sumcell"><?= $z($t['P']) ?></td><td class="sumcell"><?= $z($t['A']) ?></td>
+                    <?php if (!$tipoFiltro): ?><td class="sumcell"><?= $z($t['P']) ?></td><?php endif; ?>
+                    <td class="sumcell"><?= $z($t['A']) ?></td>
                     <td class="sumcell"><?= $z($t['L']) ?></td><td class="sumcell"><?= $z($t['F']) ?></td>
                   </tr>
                 <?php endforeach; ?>
               </tbody>
             </table>
           </div>
-          <p class="rep-legend">Leyenda: P = Presente · A = Atraso · L = Licencia · F = Falta · celdas de suma vacías = 0.</p>
+          <p class="rep-legend"><?= $tipoFiltro
+              ? 'Leyenda: celdas con el tipo seleccionado · — = sin eventos ese día · Totales en blanco = 0.'
+              : 'Leyenda: P = Presente · A = Atraso · L = Licencia · F = Falta · celdas de suma vacías = 0.' ?></p>
 
           <div class="columns mt-4 is-multiline">
             <div class="column is-6"><canvas id="chDTorta" height="200"></canvas></div>
@@ -210,8 +232,12 @@ function repHeader($h, $title) { ?>
             <div class="column is-6"><canvas id="chDLineas" height="260"></canvas></div>
           </div>
           <script>window.REP_DIAS = <?= json_encode([
-              'torta'  => ['labels'=>['Presente','Con atraso'], 'data'=>[$res['sum']['P'], $res['sum']['A']]],
-              'barras' => ['labels'=>['P','A','L','F'], 'data'=>[$res['sum']['P'],$res['sum']['A'],$res['sum']['L'],$res['sum']['F']]],
+              'torta'  => $tipoFiltro
+                  ? ['labels'=>[$tipoLbl, 'Sin evento'], 'data'=>[$res['sum'][$res['header']['tipo']], max(0, count($res['bdays']) * count($res['roster']) - $res['sum'][$res['header']['tipo']])]]
+                  : ['labels'=>['Presente','Con atraso'], 'data'=>[$res['sum']['P'], $res['sum']['A']]],
+              'barras' => $tipoFiltro
+                  ? ['labels'=>[$tipoLbl], 'data'=>[$res['sum'][$res['header']['tipo']]]]
+                  : ['labels'=>['P','A','L','F'], 'data'=>[$res['sum']['P'],$res['sum']['A'],$res['sum']['L'],$res['sum']['F']]],
               'telara' => ['labels'=>array_map(fn($p)=>'#'.$p['n'], $res['perStudent']),
                            'A'=>array_column($res['perStudent'],'A'),'L'=>array_column($res['perStudent'],'L'),'F'=>array_column($res['perStudent'],'F')],
               'lineas' => ['labels'=>array_map(fn($l)=>date('d/m',strtotime($l['d'])), $res['lineSeries']),
